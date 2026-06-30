@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="게임 클라이언트 개발 프로젝트 포트폴리오">
+  <title>Game Developer Portfolio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=11">
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <div class="cinematic-bars" aria-hidden="true">
+    <span class="cinematic-bar cinematic-bar-top"></span>
+    <span class="cinematic-bar cinematic-bar-bottom"></span>
+  </div>
+
+  <header class="site-header">
+    <a class="brand" href="#projects" aria-label="프로젝트 목록으로 이동">
+      <span class="brand-mark">SD</span>
+      <span>GAME CLIENT<br>DEVELOPER</span>
+    </a>
+    <nav aria-label="주요 메뉴">
+      <a href="#projects">PROJECTS</a>
+      <a href="#detail">DETAIL</a>
+      <a href="#contact">CONTACT</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" id="projects">
+      <div class="hero-copy">
+        <p class="eyebrow">SELECTED WORKS / 2024—2026</p>
+        <h1>PLAY.<br><span>BUILD.</span><br>ITERATE.</h1>
+        <p class="hero-description">
+          플레이의 감각을 시스템으로 설계합니다.<br>
+          VR 인터랙션부터 절차적 생성, 네트워크 게임까지.
+        </p>
+        <div class="scene-status" aria-live="polite">
+          <span>NOW SHOWING</span>
+          <strong id="scene-title">DARKNIGHT</strong>
+        </div>
+      </div>
+
+      <div class="slider-shell">
+        <div class="slider-topline">
+          <p>DRAG OR SCROLL</p>
+          <p><span id="current-index">01</span> / <span id="total-count">05</span></p>
+        </div>
+        <div class="project-track" id="project-track" tabindex="0" aria-label="게임 프로젝트 슬라이드"></div>
+        <div class="slider-controls">
+          <button class="arrow-button" id="prev-project" type="button" aria-label="이전 프로젝트">←</button>
+          <div class="progress-track" aria-hidden="true">
+            <span id="slider-progress"></span>
+          </div>
+          <button class="arrow-button" id="next-project" type="button" aria-label="다음 프로젝트">→</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="project-detail" id="detail" aria-live="polite">
+      <section class="detail-slide detail-slide-intro">
+        <div class="slide-content">
+          <div class="detail-heading">
+            <p class="eyebrow">PROJECT DEEP DIVE / 01</p>
+            <h2 id="detail-title"></h2>
+            <p id="detail-summary"></p>
+          </div>
+
+          <div class="media-frame" id="media-frame">
+            <div class="media-placeholder">
+              <span class="play-icon" aria-hidden="true">▶</span>
+              <p>GAMEPLAY VIDEO</p>
+              <small>유튜브 링크를 추가하면 이 영역에서 바로 재생됩니다.</small>
+            </div>
+          </div>
+        </div>
+        <p class="slide-cue">SCROLL TO CONTINUE ↓</p>
+      </section>
+
+      <section class="detail-slide detail-slide-info">
+        <div class="slide-content">
+          <p class="eyebrow">PROJECT DEEP DIVE / 02</p>
+          <div class="detail-grid">
+            <article class="overview-card">
+              <p class="section-number">01 / OVERVIEW</p>
+              <dl id="project-meta"></dl>
+            </article>
+
+            <article class="contribution-card">
+              <p class="section-number">02 / CONTRIBUTION</p>
+              <ul id="contribution-list"></ul>
+            </article>
+          </div>
+        </div>
+        <p class="slide-cue">IMPLEMENTATION ↓</p>
+      </section>
+
+      <section class="detail-slide detail-slide-build">
+        <div class="slide-content">
+          <article class="implementation">
+            <div>
+              <p class="section-number">03 / IMPLEMENTATION</p>
+              <h3>문제를 구조로 풀고,<br>플레이로 증명했습니다.</h3>
+            </div>
+            <div class="implementation-list" id="implementation-list"></div>
+          </article>
+
+          <div class="tech-line">
+            <p>TECH STACK</p>
+            <div id="tech-list"></div>
+          </div>
+        </div>
+        <p class="slide-cue">END OF PROJECT</p>
+      </section>
+    </section>
+  </main>
+
+  <footer id="contact">
+    <p>LET'S BUILD<br><span>SOMETHING PLAYABLE.</span></p>
+    <a href="#projects">BACK TO TOP ↑</a>
+  </footer>
+
+  <script src="script.js?v=11"></script>
+</body>
+</html>
