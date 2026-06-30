@@ -176,6 +176,13 @@ const ACTIVE_PROJECT_STORAGE_KEY = "portfolio-active-project";
 
 function loadActiveProject() {
   try {
+    const urlIndex = Number.parseInt(new URLSearchParams(window.location.search).get("project"), 10) - 1;
+    if (Number.isInteger(urlIndex) && urlIndex >= 0 && urlIndex < projects.length) return urlIndex;
+  } catch {
+    // Fall back to session storage when URL state is unavailable.
+  }
+
+  try {
     const savedIndex = Number.parseInt(sessionStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY), 10);
     return Number.isInteger(savedIndex) && savedIndex >= 0 && savedIndex < projects.length ? savedIndex : 0;
   } catch {
@@ -188,6 +195,17 @@ function saveActiveProject(index) {
     sessionStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, String(index));
   } catch {
     // Storage can be unavailable in strict privacy modes; the UI still works in memory.
+  }
+
+  try {
+    const url = new URL(window.location.href);
+    const projectValue = String(index + 1);
+    if (url.searchParams.get("project") !== projectValue) {
+      url.searchParams.set("project", projectValue);
+      window.history.replaceState(window.history.state, "", url);
+    }
+  } catch {
+    // URL state is an additional persistence layer; storage remains as a fallback.
   }
 }
 
@@ -268,7 +286,9 @@ function runCinematicTransition(target, direction) {
   if (!target || isSlideTransitioning) return;
 
   const startY = window.scrollY;
-  const targetY = Math.round(startY + target.getBoundingClientRect().top);
+  const targetY = target.classList.contains("hero")
+    ? 0
+    : Math.round(startY + target.getBoundingClientRect().top);
   if (Math.abs(targetY - startY) < 2) return;
 
   isSlideTransitioning = true;
@@ -276,7 +296,7 @@ function runCinematicTransition(target, direction) {
 
   const currentSlide = document.querySelector(".detail-slide.is-visible");
   const targetIsSlide = target.classList.contains("detail-slide");
-  const duration = 760;
+  const duration = 500;
   const startedAt = performance.now();
 
   document.body.classList.add("is-slide-transitioning", direction > 0 ? "transition-forward" : "transition-backward");
@@ -294,7 +314,7 @@ function runCinematicTransition(target, direction) {
     const eased = 0.5 - Math.cos(Math.PI * progress) / 2;
     window.scrollTo(0, startY + (targetY - startY) * eased);
 
-    if (targetIsSlide && progress >= 0.24) {
+    if (targetIsSlide && progress >= 0.12) {
       target.classList.remove("is-entering");
       target.classList.add("is-visible");
     }
@@ -485,6 +505,16 @@ const detailModeObserver = new IntersectionObserver(entries => {
   document.documentElement.classList.toggle("detail-snap", entries[0].isIntersecting);
 }, { threshold: 0 });
 detailModeObserver.observe(document.querySelector("#detail"));
+
+document.querySelectorAll("[data-scroll-target]").forEach(cue => {
+  cue.addEventListener("click", () => {
+    const targetName = cue.dataset.scrollTarget;
+    const target = targetName === "footer"
+      ? document.querySelector("footer")
+      : document.querySelectorAll(".detail-slide")[Number(targetName)];
+    runCinematicTransition(target, 1);
+  });
+});
 
 document.querySelector('nav a[href="#detail"]').addEventListener("click", event => {
   event.preventDefault();

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=11">
+  <link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>
@@ -58,6 +58,14 @@
           <button class="arrow-button" id="next-project" type="button" aria-label="다음 프로젝트">→</button>
         </div>
       </div>
+
+      <button class="slide-cue hero-scroll-cue" type="button" data-scroll-target="0" aria-label="선택한 프로젝트 상세 내용으로 이동">
+        <span class="slide-cue-label">SCROLL TO EXPLORE</span>
+        <span class="slide-cue-arrows" aria-hidden="true">
+          <span class="slide-cue-arrow"></span>
+          <span class="slide-cue-arrow"></span>
+        </span>
+      </button>
     </section>
 
     <section class="project-detail" id="detail" aria-live="polite">
@@ -77,7 +85,13 @@
             </div>
           </div>
         </div>
-        <p class="slide-cue">SCROLL TO CONTINUE ↓</p>
+        <button class="slide-cue" type="button" data-scroll-target="1" aria-label="다음 프로젝트 설명으로 이동">
+          <span class="slide-cue-label">SCROLL</span>
+          <span class="slide-cue-arrows" aria-hidden="true">
+            <span class="slide-cue-arrow"></span>
+            <span class="slide-cue-arrow"></span>
+          </span>
+        </button>
       </section>
 
       <section class="detail-slide detail-slide-info">
@@ -95,7 +109,13 @@
             </article>
           </div>
         </div>
-        <p class="slide-cue">IMPLEMENTATION ↓</p>
+        <button class="slide-cue" type="button" data-scroll-target="2" aria-label="구현 방식으로 이동">
+          <span class="slide-cue-label">KEEP SCROLLING</span>
+          <span class="slide-cue-arrows" aria-hidden="true">
+            <span class="slide-cue-arrow"></span>
+            <span class="slide-cue-arrow"></span>
+          </span>
+        </button>
       </section>
 
       <section class="detail-slide detail-slide-build">
@@ -113,7 +133,13 @@
             <div id="tech-list"></div>
           </div>
         </div>
-        <p class="slide-cue">END OF PROJECT</p>
+        <button class="slide-cue" type="button" data-scroll-target="footer" aria-label="마지막 영역으로 이동">
+          <span class="slide-cue-label">NEXT</span>
+          <span class="slide-cue-arrows" aria-hidden="true">
+            <span class="slide-cue-arrow"></span>
+            <span class="slide-cue-arrow"></span>
+          </span>
+        </button>
       </section>
     </section>
   </main>
@@ -123,6 +149,6 @@
     <a href="#projects">BACK TO TOP ↑</a>
   </footer>
 
-  <script src="script.js?v=12"></script>
+  <script src="script.js?v=16"></script>
 </body>
 </html>
