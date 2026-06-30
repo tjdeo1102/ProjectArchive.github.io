@@ -172,7 +172,26 @@ const totalCount = document.querySelector("#total-count");
 const sliderProgress = document.querySelector("#slider-progress");
 const sceneTitle = document.querySelector("#scene-title");
 
-let activeProject = 0;
+const ACTIVE_PROJECT_STORAGE_KEY = "portfolio-active-project";
+
+function loadActiveProject() {
+  try {
+    const savedIndex = Number.parseInt(sessionStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY), 10);
+    return Number.isInteger(savedIndex) && savedIndex >= 0 && savedIndex < projects.length ? savedIndex : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveActiveProject(index) {
+  try {
+    sessionStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, String(index));
+  } catch {
+    // Storage can be unavailable in strict privacy modes; the UI still works in memory.
+  }
+}
+
+let activeProject = loadActiveProject();
 let dragStartX = 0;
 let dragStartScroll = 0;
 let isDragging = false;
@@ -185,7 +204,7 @@ let lastWheelInputAt = 0;
 function renderCards() {
   track.innerHTML = projects.map((project, index) => `
     <article
-      class="project-card${index === 0 ? " active" : ""}"
+      class="project-card${index === activeProject ? " active" : ""}"
       data-index="${index}"
       style="--card-accent: ${project.accent}"
       aria-label="${project.title} 상세 보기"
@@ -371,6 +390,7 @@ function applyScene(project) {
 function renderDetail(index) {
   const project = projects[index];
   activeProject = index;
+  saveActiveProject(index);
   applyScene(project);
 
   detailTitle.textContent = project.title;
@@ -406,10 +426,8 @@ function renderDetail(index) {
   sliderProgress.style.transform = `scaleX(${(index + 1) / projects.length})`;
 }
 
-function goToProject(index, scrollToDetail = false) {
-  const safeIndex = (index + projects.length) % projects.length;
-  const card = track.children[safeIndex];
-  
+function scrollToProjectCard(index, behavior = "smooth") {
+  const card = track.children[index];
   if (!card) return;
 
   const trackRect = track.getBoundingClientRect();
@@ -420,8 +438,15 @@ function goToProject(index, scrollToDetail = false) {
 
   track.scrollTo({
     left: targetScrollLeft,
-    behavior: "smooth"
+    behavior
   });
+}
+
+function goToProject(index, scrollToDetail = false) {
+  const safeIndex = (index + projects.length) % projects.length;
+  if (!track.children[safeIndex]) return;
+
+  scrollToProjectCard(safeIndex);
   
   renderDetail(safeIndex);
 
@@ -437,8 +462,9 @@ function goToProject(index, scrollToDetail = false) {
 
 renderCards();
 syncTrackPadding();
-renderDetail(0);
+renderDetail(activeProject);
 totalCount.textContent = String(projects.length).padStart(2, "0");
+window.requestAnimationFrame(() => scrollToProjectCard(activeProject, "auto"));
 
 window.addEventListener("resize", () => {
   window.clearTimeout(resizeSettleTimer);
