@@ -480,6 +480,185 @@ h1 span {
     var(--ink);
 }
 
+.detail-slide-decisions {
+  padding-top: 44px;
+  padding-bottom: 44px;
+  background: color-mix(in srgb, var(--scene-bg) 78%, #111 22%);
+}
+
+.detail-slide-decisions .implementation {
+  margin-top: 0;
+}
+
+.notion-detail-link {
+  display: inline-block;
+  margin-top: 34px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid currentColor;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.detail-slide-process {
+  background: color-mix(in srgb, var(--scene-bg) 88%, white 12%);
+}
+
+.detail-slide-troubleshooting {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.case-study-content {
+  display: grid;
+  gap: clamp(22px, 3vw, 42px);
+}
+
+.case-study-heading h3 {
+  margin: 0;
+  font-size: clamp(32px, 4vw, 62px);
+  line-height: 1.08;
+  letter-spacing: -0.055em;
+  word-break: keep-all;
+}
+
+.case-study-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 30px;
+}
+
+.case-study-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(10px, 1.4vw, 20px);
+}
+
+.case-step {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid currentColor;
+  background: color-mix(in srgb, var(--scene-bg) 90%, white 10%);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.case-step:hover {
+  z-index: 1;
+  transform: translateY(-7px);
+  box-shadow: 10px 12px 0 color-mix(in srgb, var(--detail-accent) 65%, transparent);
+}
+
+.case-visual {
+  position: relative;
+  height: clamp(110px, 17vh, 180px);
+  margin: 0;
+  overflow: hidden;
+  color: white;
+  background: #171717;
+}
+
+.case-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.case-step:hover .case-visual img {
+  transform: scale(1.06);
+}
+
+.case-visual-empty {
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(135deg, transparent 48%, rgba(255, 255, 255, 0.12) 49% 51%, transparent 52%),
+    repeating-linear-gradient(90deg, #171717 0 18px, #1d1d1d 18px 36px);
+}
+
+.case-visual-empty > span {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
+  letter-spacing: 0.13em;
+  opacity: 0.62;
+}
+
+.case-visual figcaption {
+  position: absolute;
+  right: 8px;
+  bottom: 7px;
+  left: 8px;
+  padding: 5px 7px;
+  overflow: hidden;
+  color: white;
+  background: rgba(0, 0, 0, 0.72);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-step-copy {
+  padding: clamp(14px, 1.6vw, 24px);
+}
+
+.case-step-copy > span,
+.trouble-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--detail-accent, var(--orange));
+}
+
+.case-step h4,
+.trouble-card h4 {
+  margin: 22px 0 10px;
+  font-size: clamp(17px, 1.7vw, 24px);
+  line-height: 1.25;
+  word-break: keep-all;
+}
+
+.case-step p,
+.trouble-card > p:last-child {
+  margin: 0;
+  color: #55554f;
+  font-size: clamp(13px, 1.05vw, 16px);
+  line-height: 1.7;
+  word-break: keep-all;
+}
+
+.troubleshooting-list {
+  border-top: 1px solid rgba(241, 239, 232, 0.45);
+}
+
+.trouble-card {
+  display: grid;
+  grid-template-columns: 90px minmax(180px, 0.65fr) minmax(0, 1.35fr);
+  align-items: start;
+  gap: clamp(16px, 2.5vw, 38px);
+  padding: clamp(20px, 2.5vw, 34px) 0;
+  border-bottom: 1px solid rgba(241, 239, 232, 0.45);
+  transition: padding-left 220ms ease, border-color 220ms ease;
+}
+
+.trouble-card:hover {
+  padding-left: 16px;
+  border-color: var(--detail-accent, var(--orange));
+}
+
+.trouble-card h4 {
+  margin: 0;
+}
+
+.trouble-card > p:last-child {
+  color: rgba(241, 239, 232, 0.7);
+}
+
 .slide-content {
   width: 100%;
   opacity: 0;
@@ -687,14 +866,92 @@ body.transition-backward .detail-slide.is-entering .slide-content {
   color: rgba(255, 255, 255, 0.64);
 }
 
+.media-cover,
+.project-visual,
+.media-shade {
+  position: absolute;
+  inset: 0;
+}
+
+.project-visual {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 350ms ease;
+}
+
+.media-cover:hover .project-visual {
+  transform: scale(1.025);
+  filter: saturate(1.08);
+}
+
+.media-shade {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.08) 35%, rgba(0, 0, 0, 0.78) 100%);
+}
+
+.media-overlay {
+  position: absolute;
+  z-index: 2;
+  right: clamp(18px, 3vw, 38px);
+  bottom: clamp(20px, 3vw, 36px);
+  left: clamp(18px, 3vw, 38px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.media-overlay p {
+  margin: 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+.media-play-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 0;
+  color: var(--ink);
+  background: var(--detail-accent, var(--acid));
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.image-placeholder {
+  display: none;
+  position: absolute;
+  inset: 0;
+  place-content: center;
+  gap: 10px;
+  text-align: center;
+  background: repeating-linear-gradient(135deg, #181818 0 12px, #202020 12px 24px);
+}
+
+.image-placeholder span,
+.image-placeholder strong {
+  font-family: "IBM Plex Mono", monospace;
+  letter-spacing: 0.1em;
+}
+
+.image-placeholder span { font-size: 10px; color: rgba(255, 255, 255, 0.55); }
+.image-placeholder strong { font-size: clamp(15px, 2vw, 24px); }
+.media-frame.image-missing .project-visual { display: none; }
+.media-frame.image-missing .image-placeholder { display: grid; }
+
 .media-links {
-  position: relative;
+  position: absolute;
+  top: 16px;
+  right: 16px;
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 0;
 }
 
 .media-links a {
@@ -794,6 +1051,10 @@ body.transition-backward .detail-slide.is-entering .slide-content {
 .detail-slide-build .implementation-item {
   padding: clamp(18px, 2.2vw, 28px) 0;
   border-color: rgba(241, 239, 232, 0.45);
+}
+
+.detail-slide-decisions .implementation-item {
+  padding: clamp(18px, 2.2vw, 28px) 0;
 }
 
 .detail-slide-build .implementation-item p {
@@ -910,8 +1171,21 @@ footer a {
 
   .detail-heading,
   .detail-grid,
-  .implementation {
+  .implementation,
+  .case-study-content {
     grid-template-columns: 1fr;
+  }
+
+  .case-study-content {
+    gap: 28px;
+  }
+
+  .case-study-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .case-step {
+    min-height: 0;
   }
 
   .detail-slide-intro .slide-content {
@@ -1038,7 +1312,15 @@ footer a {
     font-size: 28px;
   }
 
+  .detail-slide-decisions .implementation h3 {
+    font-size: 28px;
+  }
+
   .detail-slide-build .implementation-list {
+    margin-top: 18px;
+  }
+
+  .detail-slide-decisions .implementation-list {
     margin-top: 18px;
   }
 
@@ -1046,6 +1328,22 @@ footer a {
     grid-template-columns: 32px 1fr;
     gap: 12px;
     padding: 11px 0;
+  }
+
+  .detail-slide-decisions .implementation-item {
+    grid-template-columns: 32px 1fr;
+    gap: 12px;
+    padding: 11px 0;
+  }
+
+  .detail-slide-decisions .implementation-item h4 {
+    margin-bottom: 5px;
+    font-size: 17px;
+  }
+
+  .detail-slide-decisions .implementation-item p {
+    font-size: 13px;
+    line-height: 1.45;
   }
 
   .detail-slide-build .implementation-item h4 {
@@ -1062,6 +1360,48 @@ footer a {
     gap: 10px;
     margin-top: 18px;
     padding: 13px 0;
+  }
+
+  .case-study-heading h3 {
+    font-size: 28px;
+  }
+
+  .case-study-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .case-step {
+    min-height: 0;
+  }
+
+  .case-visual {
+    height: 76px;
+  }
+
+  .case-step-copy {
+    padding: 9px 10px;
+  }
+
+  .case-step h4 {
+    margin: 7px 0 4px;
+    font-size: 15px;
+  }
+
+  .case-step p,
+  .trouble-card > p:last-child {
+    font-size: 12px;
+    line-height: 1.42;
+  }
+
+  .trouble-card {
+    grid-template-columns: 1fr;
+    gap: 5px;
+    padding: 12px 0;
+  }
+
+  .trouble-card h4 {
+    margin: 0 0 3px;
+    font-size: 15px;
   }
 
   .detail-slide-build #tech-list {

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#090b10">
+  <meta name="description" content="최후의 신전에서 펼쳐지는 3D 진영 심리 게임">
+  <title>The Last Temple</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="game-site.css?v=1">
+</head>
+<body>
+  <div class="temple-bg" aria-hidden="true"></div>
+  <header class="game-header">
+    <p>COMPETITION BUILD / WEBGL</p>
+    <span id="build-state">BUILD CHECKING</span>
+  </header>
+
+  <main>
+    <section class="game-shell" aria-labelledby="game-title">
+      <div class="game-copy">
+        <p class="eyebrow">HUMANS <span>VS</span> GODS</p>
+        <h1 id="game-title">THE LAST<br>TEMPLE</h1>
+        <p class="lead">봉인된 신전에서 미션으로 권능을 해금하고, 인간 사이에 숨은 신을 찾아 해방 의식을 완성하세요.</p>
+        <dl class="game-meta">
+          <div><dt>GENRE</dt><dd>3D SOCIAL DEDUCTION</dd></div>
+          <div><dt>PLAYERS</dt><dd>12 PLAYERS</dd></div>
+          <div><dt>FOCUS</dt><dd>MISSION · TRACE · JUDGEMENT</dd></div>
+        </dl>
+      </div>
+
+      <div class="player-frame" id="player-frame">
+        <div id="unity-container" hidden>
+          <canvas id="unity-canvas" tabindex="-1"></canvas>
+          <div class="loading-row">
+            <div class="loading-track"><span id="loading-progress"></span></div>
+            <p id="loading-label">0%</p>
+          </div>
+        </div>
+
+        <div class="build-placeholder" id="build-placeholder">
+          <span class="seal" aria-hidden="true"></span>
+          <p>THE RITUAL HAS NOT BEGUN</p>
+          <h2>WEBGL BUILD<br>COMING SOON</h2>
+          <small>Unity WebGL 빌드를 Build 폴더에 배치하면 이 화면에서 자동으로 실행됩니다.</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="rule-strip" aria-label="핵심 게임 흐름">
+      <article><span>01</span><h2>UNLOCK</h2><p>미션을 수행해 봉인된 능력을 해금합니다.</p></article>
+      <article><span>02</span><h2>TRACE</h2><p>행동 흔적과 목격 정보로 숨은 진영을 추리합니다.</p></article>
+      <article><span>03</span><h2>JUDGE</h2><p>짧은 심판으로 의심되는 플레이어의 권능을 봉인합니다.</p></article>
+      <article><span>04</span><h2>RITUAL</h2><p>세 제단을 복구하고 최종 해방 의식을 지켜냅니다.</p></article>
+    </section>
+  </main>
+
+  <script src="game-loader.js?v=1"></script>
+</body>
+</html>

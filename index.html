@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=14">
+  <link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>
@@ -133,6 +133,60 @@
             <div id="tech-list"></div>
           </div>
         </div>
+        <button class="slide-cue" type="button" data-scroll-target="3" aria-label="설계 선택과 문제 해결로 이동">
+          <span class="slide-cue-label">WHY THIS WAY?</span>
+          <span class="slide-cue-arrows" aria-hidden="true">
+            <span class="slide-cue-arrow"></span>
+            <span class="slide-cue-arrow"></span>
+          </span>
+        </button>
+      </section>
+
+      <section class="detail-slide detail-slide-decisions">
+        <div class="slide-content">
+          <article class="implementation">
+            <div>
+              <p class="section-number">04 / DESIGN DECISIONS</p>
+              <h3>선택에는 이유가 있고,<br>문제에는 맥락이 있습니다.</h3>
+              <a class="notion-detail-link" id="notion-detail-link" target="_blank" rel="noreferrer">READ FULL NOTES ↗</a>
+            </div>
+            <div class="implementation-list" id="decision-list"></div>
+          </article>
+        </div>
+        <button class="slide-cue" type="button" data-scroll-target="4" aria-label="단계별 구현 과정으로 이동">
+          <span class="slide-cue-label">HOW IT WORKS</span>
+          <span class="slide-cue-arrows" aria-hidden="true">
+            <span class="slide-cue-arrow"></span>
+            <span class="slide-cue-arrow"></span>
+          </span>
+        </button>
+      </section>
+
+      <section class="detail-slide detail-slide-process">
+        <div class="slide-content case-study-content">
+          <div class="case-study-heading">
+            <p class="section-number">05 / IMPLEMENTATION FLOW</p>
+            <h3>기능이 완성되는 과정을<br>단계별로 정리했습니다.</h3>
+          </div>
+          <div class="case-study-grid" id="process-list"></div>
+        </div>
+        <button class="slide-cue" type="button" data-scroll-target="5" aria-label="트러블슈팅으로 이동">
+          <span class="slide-cue-label">TROUBLESHOOTING</span>
+          <span class="slide-cue-arrows" aria-hidden="true">
+            <span class="slide-cue-arrow"></span>
+            <span class="slide-cue-arrow"></span>
+          </span>
+        </button>
+      </section>
+
+      <section class="detail-slide detail-slide-troubleshooting">
+        <div class="slide-content case-study-content">
+          <div class="case-study-heading">
+            <p class="section-number">06 / TROUBLESHOOTING</p>
+            <h3>문제를 발견하고,<br>구조적으로 해결했습니다.</h3>
+          </div>
+          <div class="troubleshooting-list" id="troubleshooting-list"></div>
+        </div>
         <button class="slide-cue" type="button" data-scroll-target="footer" aria-label="마지막 영역으로 이동">
           <span class="slide-cue-label">NEXT</span>
           <span class="slide-cue-arrows" aria-hidden="true">
@@ -149,6 +203,6 @@
     <a href="#projects">BACK TO TOP ↑</a>
   </footer>
 
-  <script src="script.js?v=16"></script>
+  <script src="script.js?v=20"></script>
 </body>
 </html>
