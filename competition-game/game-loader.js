@@ -1,11 +1,12 @@
 const buildConfig = {
-  loaderUrl: "Build/ProjectT.loader.js",
-  dataUrl: "Build/ProjectT.data",
-  frameworkUrl: "Build/ProjectT.framework.js",
-  codeUrl: "Build/ProjectT.wasm",
+  loaderUrl: "Build/WebBuild.loader.js",
+  dataUrl: "Build/WebBuild.data.unityweb",
+  frameworkUrl: "Build/WebBuild.framework.js.unityweb",
+  codeUrl: "Build/WebBuild.wasm.unityweb",
+
   streamingAssetsUrl: "StreamingAssets",
-  companyName: "Competition Team",
-  productName: "The Last Temple",
+  companyName: "SquareGame",
+  productName: "Chroma Shell",
   productVersion: "0.1"
 };
 
@@ -18,7 +19,11 @@ const loadingLabel = document.querySelector("#loading-label");
 
 async function hasWebGLBuild() {
   try {
-    const response = await fetch(buildConfig.loaderUrl, { method: "HEAD", cache: "no-store" });
+    const response = await fetch(buildConfig.loaderUrl, {
+      method: "HEAD",
+      cache: "no-store"
+    });
+
     return response.ok;
   } catch {
     return false;
@@ -28,31 +33,53 @@ async function hasWebGLBuild() {
 async function launchGame() {
   if (!await hasWebGLBuild()) {
     buildState.textContent = "BUILD PENDING";
+    console.error("Unity loader not found:", buildConfig.loaderUrl);
     return;
   }
 
   buildState.textContent = "LOADING";
+
   placeholder.hidden = true;
   unityContainer.hidden = false;
 
   const loader = document.createElement("script");
   loader.src = buildConfig.loaderUrl;
+
   loader.onload = () => {
-    createUnityInstance(canvas, buildConfig, value => {
-      const percent = Math.round(value * 100);
-      progress.style.transform = `scaleX(${value})`;
-      loadingLabel.textContent = `${percent}%`;
-    }).then(() => {
-      buildState.textContent = "PLAYING";
-      document.body.classList.add("game-ready");
-    }).catch(error => {
-      buildState.textContent = "LOAD FAILED";
-      placeholder.hidden = false;
-      unityContainer.hidden = true;
-      console.error(error);
-    });
+    createUnityInstance(
+      canvas,
+      buildConfig,
+      value => {
+        const percent = Math.round(value * 100);
+
+        progress.style.width = `${percent}%`;
+        loadingLabel.textContent = `${percent}%`;
+      }
+    )
+      .then(unityInstance => {
+        buildState.textContent = "PLAYING";
+        document.body.classList.add("game-ready");
+
+        console.log("Unity WebGL loaded.", unityInstance);
+      })
+      .catch(error => {
+        buildState.textContent = "LOAD FAILED";
+
+        placeholder.hidden = false;
+        unityContainer.hidden = true;
+
+        console.error("Unity WebGL load failed:", error);
+      });
   };
-  loader.onerror = () => { buildState.textContent = "LOAD FAILED"; };
+
+  loader.onerror = error => {
+    buildState.textContent = "LOAD FAILED";
+    placeholder.hidden = false;
+    unityContainer.hidden = true;
+
+    console.error("Unity loader script failed:", error);
+  };
+
   document.body.appendChild(loader);
 }
 
