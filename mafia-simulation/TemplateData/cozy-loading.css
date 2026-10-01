@@ -1,0 +1,55 @@
+:root { color-scheme: light; font-family: system-ui, "Malgun Gothic", sans-serif; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body, #game-shell { width: 100%; height: 100%; margin: 0; }
+body { background: #e6eacb; color: #294331; overflow: hidden; }
+#game-shell { display: grid; place-items: center; position: relative; padding: 18px; }
+#loading-screen { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px;
+  background: radial-gradient(circle at 12% 16%, #fff8d2 0 9%, transparent 28%),
+              radial-gradient(circle at 86% 80%, #b9d9b8 0 10%, transparent 34%),
+              linear-gradient(155deg, #e8f2d8, #e5e7bc); }
+.loading-card { width: min(100%, 520px); padding: clamp(28px, 5vw, 48px); text-align: center;
+  background: #fffdf1; border: 3px solid #718b67; border-radius: 30px;
+  box-shadow: 0 18px 0 #9cb494, 0 30px 65px #526c4640; }
+.eyebrow { display: block; color: #667b52; font-size: .72rem; font-weight: 800; letter-spacing: .18em; }
+.village-mark { width: 110px; height: 110px; margin: 28px auto 16px; display: grid; place-items: center;
+  border: 4px solid #dfb77b; border-radius: 32px; transform: rotate(-5deg); background: #f8dba2; }
+.village-mark span:first-child { font-size: 4.5rem; line-height: 1; transform: rotate(5deg) translateY(-7px); }
+.village-mark span:last-child { position: absolute; right: 8px; top: 1px; color: #77905e; font-size: 1.8rem; }
+h1 { margin: 0 0 12px; font-size: clamp(1.7rem, 5vw, 2.35rem); line-height: 1.2; }
+#loading-status { min-height: 1.6em; margin: 0 0 22px; font-size: 1.07rem; font-weight: 650; }
+.progress-track { width: 100%; height: 14px; overflow: hidden; border: 2px solid #8da481;
+  border-radius: 999px; background: #e1ebd6; }
+#loading-progress { width: 12%; height: 100%; border-radius: inherit; background: #79aa75; transition: width .3s ease; }
+#loading-progress.waking { width: 34%; animation: waiting 2s ease-in-out infinite alternate; }
+@keyframes waiting { to { width: 72%; } }
+#loading-detail { min-height: 2.4em; margin: 18px 0 0; color: #63725d; font-size: .91rem; line-height: 1.5; }
+.provider-trust-note { margin: 16px 0 0; color: #52654e; font-size: .78rem; line-height: 1.55; }
+.provider-trust-note strong { color: #294331; overflow-wrap: anywhere; }
+#retry-button { margin-top: 12px; padding: 10px 20px; color: #fffdf1; background: #54795b; border: 0;
+  border-radius: 14px; font: inherit; font-weight: 700; cursor: pointer; }
+#retry-button:hover, #retry-button:focus-visible { background: #34593e; }
+#unity-container { position: relative; width: min(100%, 1280px, calc(100vh * 1.6)); aspect-ratio: 16 / 10;
+  box-shadow: 0 20px 45px #30452b55; background: #18251b; }
+#unity-canvas { display: block; width: 100%; height: 100%; }
+#fullscreen-button { position: absolute; right: 12px; bottom: 12px; z-index: 2; width: 42px; height: 42px;
+  color: white; background: #18251bcc; border: 1px solid #fff8; border-radius: 8px; cursor: pointer; }
+#settings-button { position: absolute; right: 62px; bottom: 12px; z-index: 2; min-height: 42px;
+  padding: 0 14px; color: #294331; background: #fffdf1; border: 1px solid #718b67;
+  border-radius: 8px; font: inherit; font-weight: 700; cursor: pointer; }
+#settings-button:hover, #settings-button:focus-visible { background: #e8f2d8; }
+#provider-sample-link { position: absolute; left: 12px; bottom: 12px; z-index: 2; min-height: 42px;
+  display: inline-flex; align-items: center; padding: 0 14px; color: #294331; background: #fffdf1;
+  border: 1px solid #718b67; border-radius: 8px; font: inherit; font-weight: 700; text-decoration: none; }
+#provider-sample-link:hover, #provider-sample-link:focus-visible { background: #e8f2d8; }
+#unity-warning { position: absolute; top: 12px; z-index: 20; max-width: min(95vw, 620px); padding: 12px 16px;
+  color: #5d3918; background: #ffefc7; border-radius: 12px; }
+#unity-warning[data-type="error"] { color: #6b2525; background: #ffe2db; }
+@media (max-width: 720px) {
+  #game-shell { padding: 0; }
+  #unity-container { width: 100%; height: 100%; aspect-ratio: auto; }
+  .loading-card { box-shadow: 0 10px 0 #9cb494, 0 20px 45px #526c4640; }
+  #settings-button { top: 12px; right: 12px; bottom: auto; font-size: .85rem; }
+  #provider-sample-link { top: 12px; left: 12px; bottom: auto; font-size: .85rem; }
+}
+@media (prefers-reduced-motion: reduce) { #loading-progress.waking { animation: none; width: 60%; } }

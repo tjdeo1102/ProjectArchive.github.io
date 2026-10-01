@@ -1,0 +1,18 @@
+{
+  "providerOverride": "",
+  "providers": [
+    {
+      "provider": "Gemini",
+      "apiKey": "YOUR_PERSONAL_API_KEY",
+      "modelName": "YOUR_MODEL_ID",
+      "allowedModels": [],
+      "customBaseUrl": "",
+      "rpm": 10,
+      "tpm": 10000,
+      "options": {
+        "temperature": 0.7,
+        "max_tokens": 512
+      }
+    }
+  ]
+}
