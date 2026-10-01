@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: mafia-agent-framework
+    runtime: docker
+    plan: free
+    branch: main
+    autoDeployTrigger: off
+    rootDir: _backend/AgentFrameworkService
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /agent-framework/health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: AGENT_FRAMEWORK_LOCAL_DEV_MODE
+        value: "false"
+      - key: AGENT_FRAMEWORK_ALLOWED_ORIGIN
+        value: https://tjdeo1102.github.io
+      - key: AGENT_FRAMEWORK_PROVIDER_CONFIG_JSON
+        sync: false
+      - key: AGENT_FRAMEWORK_MAX_SESSIONS
+        value: "2"
+      - key: AGENT_FRAMEWORK_MAX_CALLS_PER_SESSION
+        value: "80"
+      - key: AGENT_FRAMEWORK_MAX_TOKENS_PER_SESSION
+        value: "30000"
+      - key: AGENT_FRAMEWORK_DAILY_TOKEN_BUDGET
+        value: "50000"
+      - key: AGENT_FRAMEWORK_MAX_OUTPUT_TOKENS
+        value: "1024"

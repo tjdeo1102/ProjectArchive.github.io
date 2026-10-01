@@ -1,0 +1,12 @@
+bin/
+obj/
+data/
+*.env
+*.env.*
+*.key
+*.pem
+*.p12
+*secret*
+*credential*
+*token*
+llm_config*.json
