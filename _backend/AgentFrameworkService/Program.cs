@@ -1,4 +1,5 @@
 using MafiaSimulation.AgentFrameworkService;
+using Microsoft.Extensions.AI;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
@@ -10,8 +11,6 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 var deployment = new DeploymentOptions();
 string? allowedOrigin = deployment.AllowedBrowserOrigin;
-if (!deployment.LocalDevelopment)
-    ProviderFactory.ReadCollection(string.Empty, deployment);
 if (deployment.LocalDevelopment && deployment.WebRoot != null)
     throw new InvalidOperationException("A public WebGL build cannot run with local development credentials enabled.");
 
@@ -32,6 +31,15 @@ builder.Services.AddHostedService<SessionCleanupService>();
 builder.Services.AddRateLimiter(options => options.AddFixedWindowLimiter("session-create", limiter =>
 {
     limiter.PermitLimit = 12;
+    limiter.Window = TimeSpan.FromMinutes(1);
+    limiter.QueueLimit = 0;
+    limiter.AutoReplenishment = true;
+}));
+builder.Services.Configure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(options =>
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests);
+builder.Services.AddRateLimiter(options => options.AddFixedWindowLimiter("provider-validate", limiter =>
+{
+    limiter.PermitLimit = 4;
     limiter.Window = TimeSpan.FromMinutes(1);
     limiter.QueueLimit = 0;
     limiter.AutoReplenishment = true;
@@ -58,8 +66,59 @@ else
 
 routes.MapGet("/health", () => Results.Ok(new { status = "ok", framework = "Microsoft Agent Framework for .NET" }));
 
-routes.MapPost("/sessions", async (CreateSessionRequest request, SessionRegistry registry, CancellationToken token) =>
+routes.MapPost("/providers/validate", async (ProviderValidationRequest request, HttpContext context, CancellationToken cancellationToken) =>
 {
+    context.Response.Headers.CacheControl = "no-store";
+    try
+    {
+        ProviderCollection collection = ProviderFactory.ReadCollection(request.ProviderConfigJson, deployment);
+        var candidates = collection.Providers
+            .SelectMany(provider => new[] { provider.ModelName }.Concat(provider.AllowedModels ?? [])
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(model => (provider, model)))
+            .ToList();
+        if (candidates.Count > 8)
+            return Results.BadRequest(new { detail = "Upload at most eight models for validation." });
+
+        var verified = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (provider, model) in candidates)
+        {
+            IChatClient client = ProviderFactory.Create(provider, model, deployment);
+            try
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(TimeSpan.FromSeconds(15));
+                await client.GetResponseAsync(
+                    [new ChatMessage(ChatRole.User, "Reply OK.")],
+                    new ChatOptions { MaxOutputTokens = 8 }, timeout.Token);
+                if (!verified.TryGetValue(provider.Provider, out List<string>? models))
+                    verified[provider.Provider] = models = [];
+                models.Add(model);
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Do not expose provider errors or credentials to the browser or server logs.
+            }
+            finally
+            {
+                if (client is IAsyncDisposable asyncDisposable) await asyncDisposable.DisposeAsync();
+                else if (client is IDisposable disposable) disposable.Dispose();
+            }
+        }
+        if (verified.Count == 0)
+            return Results.BadRequest(new { detail = "No models accepted a test request. Check API keys, model names and provider quotas." });
+        return Results.Ok(new ProviderValidationResponse(verified
+            .Select(item => new ProviderModelList(item.Key, item.Value)).ToList()));
+    }
+    catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or JsonException or NotSupportedException)
+    {
+        return Results.BadRequest(new { detail = "Invalid Provider configuration. Check credentials, models and limits." });
+    }
+}).RequireRateLimiting("provider-validate");
+
+routes.MapPost("/sessions", async (CreateSessionRequest request, HttpContext context, SessionRegistry registry, CancellationToken token) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
     try
     {
         SessionRequestValidator.Validate(request, deployment);
@@ -84,6 +143,26 @@ routes.MapDelete("/sessions/{sessionId}", (string sessionId, HttpContext context
         await registry.RemoveAsync(sessionId, GetToken(context));
         return Results.NoContent();
     }));
+
+routes.MapPost("/sessions/{sessionId}/close", async (string sessionId, HttpContext context, SessionRegistry registry) =>
+{
+    if (context.Request.ContentLength is > 128) return Results.BadRequest();
+    using var reader = new StreamReader(context.Request.Body);
+    char[] buffer = new char[129];
+    int length = await reader.ReadBlockAsync(buffer.AsMemory(), context.RequestAborted);
+    if (length is < 1 or > 128) return Results.BadRequest();
+    string token = new(buffer, 0, length);
+    try
+    {
+        await registry.RemoveAsync(sessionId, token);
+        return Results.NoContent();
+    }
+    catch (UnauthorizedAccessException) { return Results.Unauthorized(); }
+    catch (KeyNotFoundException) { return Results.NotFound(); }
+});
+
+routes.MapPost("/sessions/{sessionId}/heartbeat", (string sessionId, HttpContext context, SessionRegistry registry) =>
+    WithSessionAsync(sessionId, context, registry, _ => Task.FromResult<IResult>(Results.NoContent())));
 
 routes.MapPost("/sessions/{sessionId}/actions", (string sessionId, AgentActionRequest request, HttpContext context, SessionRegistry registry) =>
     WithSessionAsync(sessionId, context, registry, async session =>

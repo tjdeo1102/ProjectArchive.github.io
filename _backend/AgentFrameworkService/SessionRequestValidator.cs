@@ -13,8 +13,10 @@ internal static class SessionRequestValidator
         if (request.Language is not ("ko" or "en") ||
             (!deployment.LocalDevelopment && request.Language != "ko"))
             throw new ArgumentException("Unsupported game language.");
-        if (!deployment.LocalDevelopment && !string.IsNullOrWhiteSpace(request.ProviderConfigJson))
-            throw new ArgumentException("Provider credentials must be configured on the service.");
+        if (!deployment.LocalDevelopment && string.IsNullOrWhiteSpace(request.ProviderConfigJson))
+            throw new ArgumentException("A Provider JSON file is required for this game session.");
+        if ((request.ProviderConfigJson?.Length ?? 0) > 100_000)
+            throw new ArgumentException("Provider JSON is too large.");
 
         var agentIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int mafiaCount = 0;

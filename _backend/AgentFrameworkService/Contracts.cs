@@ -17,6 +17,13 @@ public sealed record ProviderCollection(
     [property: JsonPropertyName("providerOverride")] string ProviderOverride,
     [property: JsonPropertyName("providers")] List<ProviderConfig> Providers);
 
+public sealed record ProviderValidationRequest(
+    [property: JsonPropertyName("provider_config_json")] string ProviderConfigJson);
+
+public sealed record ProviderModelList(string Provider, List<string> Models);
+
+public sealed record ProviderValidationResponse(List<ProviderModelList> Providers);
+
 public sealed record AgentSpec(
     [property: JsonPropertyName("agent_id")] string AgentId,
     [property: JsonPropertyName("agent_name")] string AgentName,

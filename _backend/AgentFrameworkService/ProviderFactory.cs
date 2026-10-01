@@ -11,6 +11,11 @@ namespace MafiaSimulation.AgentFrameworkService;
 
 internal static class ProviderFactory
 {
+    private static readonly HashSet<string> PublicProviders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "DeepSeek", "Gemini", "Groq", "OpenRouter", "HuggingFace", "Nvidia",
+        "Cerebras", "AnthropicClaude", "OpenAI"
+    };
     private static readonly IReadOnlyDictionary<string, string> DefaultBaseUrls = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         ["DeepSeek"] = "https://api.deepseek.com/v1",
@@ -26,24 +31,60 @@ internal static class ProviderFactory
     public static ProviderCollection ReadCollection(string requestJson, DeploymentOptions deployment)
     {
         string json = StripBom(requestJson);
-        if (!string.IsNullOrWhiteSpace(json) && !deployment.LocalDevelopment)
-            throw new InvalidOperationException("Client-supplied Provider configuration is disabled.");
-        if (string.IsNullOrWhiteSpace(json)) json = StripBom(Environment.GetEnvironmentVariable("AGENT_FRAMEWORK_PROVIDER_CONFIG_JSON") ?? "");
-        string? path = Environment.GetEnvironmentVariable("AGENT_FRAMEWORK_PROVIDER_CONFIG_PATH");
-        if (string.IsNullOrWhiteSpace(json) && !string.IsNullOrWhiteSpace(path)) json = File.ReadAllText(path).TrimStart('\uFEFF');
+        if (string.IsNullOrWhiteSpace(json) && deployment.LocalDevelopment)
+        {
+            json = StripBom(Environment.GetEnvironmentVariable("AGENT_FRAMEWORK_PROVIDER_CONFIG_JSON") ?? "");
+            string? path = Environment.GetEnvironmentVariable("AGENT_FRAMEWORK_PROVIDER_CONFIG_PATH");
+            if (string.IsNullOrWhiteSpace(json) && !string.IsNullOrWhiteSpace(path))
+                json = File.ReadAllText(path).TrimStart('\uFEFF');
+        }
         if (string.IsNullOrWhiteSpace(json))
-            throw new InvalidOperationException("Provider configuration is missing. Set AGENT_FRAMEWORK_PROVIDER_CONFIG_JSON or AGENT_FRAMEWORK_PROVIDER_CONFIG_PATH.");
+            throw new InvalidOperationException("Provider configuration is missing for this game session.");
+        if (json.Length > 100_000)
+            throw new InvalidOperationException("Provider configuration is too large.");
         ProviderCollection collection = JsonSerializer.Deserialize<ProviderCollection>(json, JsonDefaults.Options)
             ?? throw new InvalidOperationException("Provider configuration JSON is invalid.");
-        if (collection.Providers is not { Count: > 0 } ||
+        if (collection.Providers is not { Count: > 0 and <= 8 } ||
             collection.Providers.Any(item => item is null || string.IsNullOrWhiteSpace(item.Provider) || string.IsNullOrWhiteSpace(item.ModelName)) ||
             collection.Providers.Select(item => item.Provider).Distinct(StringComparer.OrdinalIgnoreCase).Count() != collection.Providers.Count)
             throw new InvalidOperationException("Provider configuration must contain unique providers and model names.");
         if (!deployment.LocalDevelopment && collection.Providers.Any(item =>
-                item.Rpm <= 0 || item.Tpm <= 0 ||
-                (string.IsNullOrWhiteSpace(item.ApiKey) && !item.Provider.Equals("OllamaLocal", StringComparison.OrdinalIgnoreCase))))
-            throw new InvalidOperationException("Public providers require credentials and positive RPM/TPM limits.");
-        return collection;
+                !PublicProviders.Contains(item.Provider) ||
+                !string.IsNullOrWhiteSpace(item.CustomBaseUrl) ||
+                string.IsNullOrWhiteSpace(item.ApiKey) || item.ApiKey.Length > 8192 ||
+                item.ApiKey.Any(char.IsControl) ||
+                item.Rpm is < 1 or > 1000 || item.Tpm is < 1 or > 1_000_000 ||
+                !ValidModelName(item.ModelName) ||
+                item.AllowedModels is { Count: > 16 } ||
+                (item.AllowedModels?.Any(model => !ValidModelName(model)) ?? false) ||
+                !ValidOptions(item.Options)))
+            throw new InvalidOperationException("Public Provider configuration contains an unsupported provider, endpoint, model or limit.");
+        // Public NPC assignments must always use the explicitly selected provider/model.
+        return deployment.LocalDevelopment ? collection : collection with { ProviderOverride = "" };
+    }
+
+    private static bool ValidModelName(string? name)
+        => !string.IsNullOrWhiteSpace(name) && name.Length <= 128 &&
+           !name.Any(char.IsControl) && !name.Any(char.IsWhiteSpace);
+
+    private static bool ValidOptions(Dictionary<string, JsonElement>? options)
+    {
+        if (options is null) return true;
+        if (options.Count > 3) return false;
+        foreach ((string name, JsonElement value) in options)
+        {
+            if (name is "temperature" or "top_p")
+            {
+                if (!value.TryGetDouble(out double number) || !double.IsFinite(number) ||
+                    number < 0 || number > (name == "top_p" ? 1 : 2)) return false;
+            }
+            else if (name is "max_tokens" or "max_completion_tokens")
+            {
+                if (!value.TryGetInt32(out int tokens) || tokens < 1 || tokens > 8192) return false;
+            }
+            else return false;
+        }
+        return true;
     }
 
     public static IChatClient Create(ProviderConfig config, string modelOverride, DeploymentOptions deployment)

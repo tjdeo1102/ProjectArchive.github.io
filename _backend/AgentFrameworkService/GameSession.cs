@@ -111,7 +111,8 @@ internal sealed class GameSession : IAsyncDisposable
         var runtimes = new Dictionary<string, AgentRuntime>(StringComparer.Ordinal);
         var reachability = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         var providerStatuses = new List<ProviderStatus>();
-        bool ownsRateLimiters = deployment.LocalDevelopment && !string.IsNullOrWhiteSpace(request.ProviderConfigJson);
+        // User-supplied credentials and quotas must never share a cross-session limiter.
+        bool ownsRateLimiters = !string.IsNullOrWhiteSpace(request.ProviderConfigJson);
         Dictionary<string, ProviderRateLimitCoordinator> rateLimiters = providers.ToDictionary(
             item => item.Key,
             item => ownsRateLimiters
