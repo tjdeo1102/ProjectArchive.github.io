@@ -56,8 +56,9 @@
   for (const level of ["log", "debug", "info", "warn", "error"]) {
     const original = console[level].bind(console);
     console[level] = (...values) => {
-      original(...values);
-      appendLog(level, values);
+      const safeValues = values.map(value => redactLogText(safeLogText(value)));
+      original(...safeValues);
+      appendLog(level, safeValues);
     };
   }
   window.addEventListener("error", event => appendLog("error", [event.message || "브라우저 오류"]));
