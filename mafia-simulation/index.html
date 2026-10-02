@@ -16,6 +16,7 @@
         <p id="loading-status">연결을 준비하고 있어요.</p>
         <div class="progress-track" aria-hidden="true"><div id="loading-progress"></div></div>
         <p id="loading-detail">잠시만 기다려 주세요.</p>
+        <button id="launch-button" type="button" hidden>마을 입장하기</button>
         <p class="provider-trust-note">개인 Provider JSON의 API 키는 <strong id="provider-service-host">연결 확인 중</strong>으로 HTTPS 전송됩니다. 모델 확인과 게임 진행에 본인 API 사용량·요금이 발생할 수 있습니다. 새로고침하면 브라우저 설정은 삭제됩니다.</p>
         <button id="retry-button" type="button" hidden>다시 연결하기</button>
       </div>
@@ -30,15 +31,15 @@
   </main>
   <script>
     window.cozyUnityBuild = {
-      loaderUrl: "Build/v0.3.3.loader.js",
+      loaderUrl: "Build/v0.3.4.loader.js",
       config: {
-        dataUrl: "Build/v0.3.3.data.unityweb",
-        frameworkUrl: "Build/v0.3.3.framework.js.unityweb",
-        codeUrl: "Build/v0.3.3.wasm.unityweb",
+        dataUrl: "Build/v0.3.4.data",
+        frameworkUrl: "Build/v0.3.4.framework.js",
+        codeUrl: "Build/v0.3.4.wasm",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "MafiaSimulation",
-        productVersion: "0.3.3",
+        productVersion: "0.3.4",
         showBanner: function (message, type) {
           var warning = document.getElementById("unity-warning");
           warning.textContent = message;

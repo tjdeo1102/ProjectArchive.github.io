@@ -30,7 +30,7 @@
 ## 실패 시 점검
 
 - 로딩 화면에서 서버 연결이 끝나지 않음: Render 로그, `/agent-framework/health`, 정확한 CORS origin, Pages의 `agent-framework-config.json` 주소를 확인한다.
-- 게임 파일 로딩 실패: Pages의 `Build/*.unityweb` 요청 상태와 `TemplateData` 파일 경로를 확인한다.
+- 게임 파일 로딩 실패: Pages의 `Build/*` 요청 상태와 `TemplateData` 파일 경로를 확인한다. `v0.3.4`부터는 GitHub Pages의 압축 헤더 제약에 맞춰 비압축 `.data`/`.wasm` 파일을 사용한다.
 - 게임 시작 후 세션 생성 실패: Render 로그의 예외 종류와 Provider의 모델명·키·RPM/TPM을 확인한다. `health` 성공은 LLM 호출 성공을 의미하지 않는다.
 - 예기치 않은 비용: 사용자가 즉시 해당 제공업체 키를 비활성화하고 사용 내역을 확인하도록 안내한다. Render의 무료 호스팅 한도와 방문자 LLM 제공업체의 API 과금은 별개다.
 

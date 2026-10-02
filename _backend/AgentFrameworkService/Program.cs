@@ -55,6 +55,7 @@ if (deployment.WebRoot is { } webRoot)
     var provider = new PhysicalFileProvider(webRoot);
     var contentTypes = new FileExtensionContentTypeProvider();
     contentTypes.Mappings[".unityweb"] = "application/octet-stream";
+    contentTypes.Mappings[".data"] = "application/octet-stream";
     app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = provider });
     app.UseStaticFiles(new StaticFileOptions { FileProvider = provider, ContentTypeProvider = contentTypes });
     routes = app.MapGroup("/agent-framework");

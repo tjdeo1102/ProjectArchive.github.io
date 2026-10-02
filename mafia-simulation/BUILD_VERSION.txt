@@ -1,2 +1,2 @@
-WebGL v0.3.3
+WebGL v0.3.4
 Source branch: santamkj/webBuild

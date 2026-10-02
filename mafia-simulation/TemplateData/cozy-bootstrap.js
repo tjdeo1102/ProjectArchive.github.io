@@ -7,6 +7,7 @@
   const serviceHost = document.getElementById("provider-service-host");
   const progress = document.getElementById("loading-progress");
   const retry = document.getElementById("retry-button");
+  const launch = document.getElementById("launch-button");
   const canvas = document.getElementById("unity-canvas");
   const container = document.getElementById("unity-container");
   const fullscreen = document.getElementById("fullscreen-button");
@@ -61,6 +62,7 @@
   retry.addEventListener("click", () => window.location.reload());
 
   function fail(message, explanation) {
+    launch.hidden = true;
     status.textContent = message;
     detail.textContent = explanation;
     progress.classList.remove("waking");
@@ -146,7 +148,13 @@
       const apiBaseUrl = await readApiBaseUrl();
       serviceHost.textContent = new URL(apiBaseUrl).host;
       await waitForBackend(apiBaseUrl);
-      status.textContent = "서버 연결 완료! 게임을 준비하고 있어요.";
+      status.textContent = "서버 연결 완료!";
+      detail.textContent = "마을 입장하기를 눌러 게임과 소리를 시작해 주세요.";
+      progress.classList.remove("waking");
+      launch.hidden = false;
+      await new Promise(resolve => launch.addEventListener("click", resolve, { once: true }));
+      launch.hidden = true;
+      status.textContent = "게임을 준비하고 있어요.";
       detail.textContent = "마을 지도를 불러오는 중…";
       container.hidden = false;
       const unity = await loadUnity();

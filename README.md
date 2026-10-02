@@ -4,4 +4,4 @@
 
 MafiaSimulation의 `santamkj/webBuild`는 빌드 원본이다. 새 WebGL 빌드나 Agent Framework 서비스 변경은 보안·비용 게이트를 통과한 뒤 이 저장소에 동기화한다. 현재 `_backend/AgentFrameworkService/DEPLOY_RENDER.md`에 공개 전 확인 사항과 연결 절차를 기록했다.
 
-Cozy 마을 WebGL `v0.3.3`은 `/mafia-simulation/` 경로에 배포한다. 이 경로의 `agent-framework-config.json`은 별도 Render 서비스의 HTTPS API 주소만 포함하며, 방문자의 Provider 키는 저장하지 않는다.
+Cozy 마을 WebGL `v0.3.4`는 `/mafia-simulation/` 경로에 배포한다. 이 경로의 `agent-framework-config.json`은 별도 Render 서비스의 HTTPS API 주소만 포함하며, 방문자의 Provider 키는 저장하지 않는다.
