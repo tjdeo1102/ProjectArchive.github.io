@@ -254,14 +254,23 @@ static async Task<IResult> WithSessionAsync(
     catch (SessionAiLimitException exception)
     {
         var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("AgentFrameworkApi");
-        logger.LogWarning("Game AI limit reached: {ReasonCode}", exception.ReasonCode);
+        logger.LogWarning(
+            "Game AI limit reached: {ReasonCode}; calls={Calls}; countedTokens={CountedTokens}; measuredTokens={MeasuredTokens}; measuredCalls={MeasuredCalls}; unmeasuredCalls={UnmeasuredCalls}; failedCalls={FailedCalls}",
+            exception.ReasonCode,
+            exception.Usage?.Calls,
+            exception.Usage?.CountedTokens,
+            exception.Usage?.MeasuredTokens,
+            exception.Usage?.MeasuredCalls,
+            exception.Usage?.UnmeasuredCalls,
+            exception.Usage?.FailedCalls);
         string detail = exception.ReasonCode == "server_daily_ai_limit"
             ? "The server's daily AI allowance has been reached. Please try again later."
             : "This game session has reached its AI usage limit. Start a new game to continue.";
         return Results.Json(new
         {
             code = exception.ReasonCode,
-            detail
+            detail,
+            usage = exception.Usage
         }, statusCode: StatusCodes.Status429TooManyRequests);
     }
     catch (ProviderTpmLimitException exception)

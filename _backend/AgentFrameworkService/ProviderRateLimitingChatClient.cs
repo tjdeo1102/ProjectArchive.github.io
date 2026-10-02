@@ -5,9 +5,22 @@ using Microsoft.Extensions.AI;
 
 namespace MafiaSimulation.AgentFrameworkService;
 
-internal sealed class SessionAiLimitException(string reasonCode) : InvalidOperationException
+internal sealed record SessionUsageSnapshot(
+    int Calls,
+    long CountedTokens,
+    long MeasuredTokens,
+    int MeasuredCalls,
+    int UnmeasuredCalls,
+    int FailedCalls,
+    int MaxCalls,
+    int MaxTokens);
+
+internal sealed class SessionAiLimitException(
+    string reasonCode,
+    SessionUsageSnapshot? usage = null) : InvalidOperationException
 {
     public string ReasonCode { get; } = reasonCode;
+    public SessionUsageSnapshot? Usage { get; } = usage;
 }
 
 internal sealed class ProviderTpmLimitException(string providerName) : InvalidOperationException
@@ -40,9 +53,10 @@ internal sealed class ProviderRateLimitCoordinator : IDisposable
         TokensPerMinute = Math.Max(0, config.Tpm);
 
         if (RequestsPerMinute > 0)
-            _requestLimiter = CreateSlidingWindowLimiter(RequestsPerMinute);
+            _requestLimiter = CreateSlidingWindowLimiter(RequestsPerMinute, 20);
         if (TokensPerMinute > 0)
-            _tokenLimiter = CreateSlidingWindowLimiter(TokensPerMinute);
+            // QueueLimit is cumulative token permits, not a request count.
+            _tokenLimiter = CreateSlidingWindowLimiter(TokensPerMinute, TokensPerMinute);
     }
 
     public string ProviderName { get; }
@@ -83,14 +97,14 @@ internal sealed class ProviderRateLimitCoordinator : IDisposable
             throw new ProviderQueueLimitException(ProviderName, limitName);
     }
 
-    private static SlidingWindowRateLimiter CreateSlidingWindowLimiter(int permitLimit)
+    private static SlidingWindowRateLimiter CreateSlidingWindowLimiter(int permitLimit, int queueLimit)
         => new(new SlidingWindowRateLimiterOptions
         {
             PermitLimit = permitLimit,
             Window = TimeSpan.FromMinutes(1),
             SegmentsPerWindow = 60,
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-            QueueLimit = 20,
+            QueueLimit = queueLimit,
             AutoReplenishment = true
         });
 
@@ -165,6 +179,10 @@ internal sealed class SessionCallBudget(DeploymentOptions deployment)
     private readonly object _sync = new();
     private int _calls;
     private long _estimatedTokens;
+    private long _measuredTokens;
+    private int _measuredCalls;
+    private int _unmeasuredCalls;
+    private int _failedCalls;
 
     public int Reserve(IReadOnlyList<ChatMessage> messages, ChatOptions? options)
     {
@@ -172,9 +190,9 @@ internal sealed class SessionCallBudget(DeploymentOptions deployment)
         lock (_sync)
         {
             if (_calls >= deployment.MaxCallsPerSession)
-                throw new SessionAiLimitException("session_call_limit");
+                throw new SessionAiLimitException("session_call_limit", SnapshotLocked());
             if (_estimatedTokens + estimatedTokens > deployment.MaxEstimatedTokensPerSession)
-                throw new SessionAiLimitException("session_token_limit");
+                throw new SessionAiLimitException("session_token_limit", SnapshotLocked());
             _calls++;
             _estimatedTokens += estimatedTokens;
         }
@@ -191,15 +209,38 @@ internal sealed class SessionCallBudget(DeploymentOptions deployment)
     }
 
     public void Reconcile(int reservedTokens, ChatResponse response)
+        => Reconcile(reservedTokens, response.Usage);
+
+    public void Reconcile(int reservedTokens, UsageDetails? usage)
     {
-        UsageDetails? usage = response.Usage;
         long? actualTokens = usage?.TotalTokenCount;
         if (actualTokens is not > 0 && (usage?.InputTokenCount is > 0 || usage?.OutputTokenCount is > 0))
             actualTokens = (usage.InputTokenCount ?? 0) + (usage.OutputTokenCount ?? 0);
-        if (actualTokens is not > 0) return;
         lock (_sync)
-            _estimatedTokens = Math.Max(0, _estimatedTokens - reservedTokens + actualTokens.Value);
+        {
+            if (actualTokens is > 0)
+            {
+                _estimatedTokens = Math.Max(0, _estimatedTokens - reservedTokens + actualTokens.Value);
+                _measuredTokens += actualTokens.Value;
+                _measuredCalls++;
+            }
+            else
+            {
+                // Keep the conservative reservation when a Provider gives no usage data.
+                _unmeasuredCalls++;
+            }
+        }
     }
+
+    public void RecordFailure()
+    {
+        lock (_sync) _failedCalls++;
+    }
+
+    private SessionUsageSnapshot SnapshotLocked()
+        => new(_calls, _estimatedTokens, _measuredTokens, _measuredCalls,
+            _unmeasuredCalls, _failedCalls,
+            deployment.MaxCallsPerSession, deployment.MaxEstimatedTokensPerSession);
 }
 
 internal sealed class ProviderRateLimitingChatClient(
@@ -224,7 +265,17 @@ internal sealed class ProviderRateLimitingChatClient(
             budget.Release(reservedTokens);
             throw;
         }
-        ChatResponse response = await base.GetResponseAsync(requestMessages, options, cancellationToken).ConfigureAwait(false);
+        ChatResponse response;
+        try
+        {
+            response = await base.GetResponseAsync(requestMessages, options, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            // The Provider might have billed a failed request, so retain its reservation.
+            budget.RecordFailure();
+            throw;
+        }
         budget.Reconcile(reservedTokens, response);
         return response;
     }
@@ -245,11 +296,24 @@ internal sealed class ProviderRateLimitingChatClient(
             budget.Release(reservedTokens);
             throw;
         }
-        await foreach (ChatResponseUpdate update in base
-                           .GetStreamingResponseAsync(requestMessages, options, cancellationToken)
-                           .ConfigureAwait(false))
+        UsageDetails? usage = null;
+        bool completed = false;
+        try
         {
-            yield return update;
+            await foreach (ChatResponseUpdate update in base
+                               .GetStreamingResponseAsync(requestMessages, options, cancellationToken)
+                               .ConfigureAwait(false))
+            {
+                foreach (AIContent content in update.Contents)
+                    if (content is UsageContent reportedUsage) usage = reportedUsage.Details;
+                yield return update;
+            }
+            completed = true;
+        }
+        finally
+        {
+            if (completed) budget.Reconcile(reservedTokens, usage);
+            else budget.RecordFailure();
         }
     }
 
