@@ -12,6 +12,62 @@
   const container = document.getElementById("unity-container");
   const fullscreen = document.getElementById("fullscreen-button");
   const settings = document.getElementById("settings-button");
+  const consoleOutput = document.getElementById("web-console-output");
+  const consoleClear = document.getElementById("web-console-clear");
+  const visibleLogs = [];
+  let logRenderQueued = false;
+
+  function safeLogText(value) {
+    if (typeof value === "string") return value;
+    if (value instanceof Error) return value.message;
+    if (value === null || ["number", "boolean", "undefined"].includes(typeof value))
+      return String(value);
+    // Never serialize arbitrary objects: they may contain uploaded Provider credentials.
+    return "[객체]";
+  }
+
+  function redactLogText(value) {
+    return value
+      .replace(/(Bearer\s+)[A-Za-z0-9._~+/-]+/gi, "$1[비공개]")
+      .replace(/((?:api[_-]?key|session[_-]?token|x-agent-session-token|authorization|access[_-]?token|secret)\s*["']?\s*[:=]\s*["']?)[^"',}\s]+/gi, "$1[비공개]")
+      .replace(/\b(?:sk-[A-Za-z0-9_-]{16,}|AIza[A-Za-z0-9_-]{20,}|gsk_[A-Za-z0-9_-]{16,}|hf_[A-Za-z0-9_-]{16,}|[a-fA-F0-9]{64})\b/g, "[비공개 키]");
+  }
+
+  function appendLog(level, values) {
+    if (!consoleOutput) return;
+    try {
+      const raw = values.map(safeLogText).join(" ");
+      const message = redactLogText(raw).replace(/[\r\n]+/g, " ⏎ ").slice(0, 1200);
+      if (!message) return;
+      visibleLogs.push(`[${new Date().toLocaleTimeString("ko-KR", { hour12: false })}] [${level}] ${message}`);
+      if (visibleLogs.length > 200) visibleLogs.splice(0, visibleLogs.length - 200);
+      if (logRenderQueued) return;
+      logRenderQueued = true;
+      window.requestAnimationFrame(() => {
+        logRenderQueued = false;
+        consoleOutput.value = visibleLogs.join("\n");
+        consoleOutput.scrollTop = consoleOutput.scrollHeight;
+      });
+    } catch (_) {
+      // Logging must never interrupt the game.
+    }
+  }
+
+  for (const level of ["log", "debug", "info", "warn", "error"]) {
+    const original = console[level].bind(console);
+    console[level] = (...values) => {
+      original(...values);
+      appendLog(level, values);
+    };
+  }
+  window.addEventListener("error", event => appendLog("error", [event.message || "브라우저 오류"]));
+  window.addEventListener("unhandledrejection", event =>
+    appendLog("error", [event.reason instanceof Error ? event.reason.message : event.reason]));
+  if (consoleClear) consoleClear.addEventListener("click", () => {
+    visibleLogs.length = 0;
+    consoleOutput.value = "";
+  });
+  appendLog("info", ["실행 로그가 준비되었습니다."]);
   const maxWakeMilliseconds = 120000;
   let unityInstance = null;
   let liveSession = null;

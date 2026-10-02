@@ -5,6 +5,22 @@ using Microsoft.Extensions.AI;
 
 namespace MafiaSimulation.AgentFrameworkService;
 
+internal sealed class SessionAiLimitException(string reasonCode) : InvalidOperationException
+{
+    public string ReasonCode { get; } = reasonCode;
+}
+
+internal sealed class ProviderTpmLimitException(string providerName) : InvalidOperationException
+{
+    public string ProviderName { get; } = providerName;
+}
+
+internal sealed class ProviderQueueLimitException(string providerName, string limitName) : InvalidOperationException
+{
+    public string ProviderName { get; } = providerName;
+    public string LimitName { get; } = limitName;
+}
+
 /// <summary>
 /// llm_config의 Provider별 RPM/TPM을 Agent Framework의 IChatClient 미들웨어에서 적용한다.
 /// 동일 Provider를 사용하는 여러 NPC는 하나의 coordinator를 공유한다.
@@ -43,7 +59,7 @@ internal sealed class ProviderRateLimitCoordinator : IDisposable
     {
         int estimatedTokens = EstimateTokenBudget(messages, options);
         if (_tokenLimiter != null && estimatedTokens > TokensPerMinute)
-            throw new InvalidOperationException($"Request estimate exceeds provider {ProviderName} TPM.");
+            throw new ProviderTpmLimitException(ProviderName);
         _dailyBudget?.Reserve(estimatedTokens);
         if (_requestLimiter != null)
             await AcquireAsync(_requestLimiter, 1, "RPM", cancellationToken).ConfigureAwait(false);
@@ -64,8 +80,7 @@ internal sealed class ProviderRateLimitCoordinator : IDisposable
             .AcquireAsync(Math.Max(1, permitCount), cancellationToken)
             .ConfigureAwait(false);
         if (!lease.IsAcquired)
-            throw new InvalidOperationException(
-                $"Unable to acquire {limitName} lease for provider {ProviderName}.");
+            throw new ProviderQueueLimitException(ProviderName, limitName);
     }
 
     private static SlidingWindowRateLimiter CreateSlidingWindowLimiter(int permitLimit)
@@ -124,7 +139,7 @@ internal sealed class DailyTokenBudget(DeploymentOptions deployment)
                 _estimatedTokens = 0;
             }
             if (_estimatedTokens + estimatedTokens > deployment.MaxEstimatedTokensPerDay)
-                throw new InvalidOperationException("The public AI budget has been reached for today.");
+                throw new SessionAiLimitException("server_daily_ai_limit");
             _estimatedTokens += estimatedTokens;
         }
     }
@@ -151,17 +166,39 @@ internal sealed class SessionCallBudget(DeploymentOptions deployment)
     private int _calls;
     private long _estimatedTokens;
 
-    public void Reserve(IReadOnlyList<ChatMessage> messages, ChatOptions? options)
+    public int Reserve(IReadOnlyList<ChatMessage> messages, ChatOptions? options)
     {
         int estimatedTokens = ProviderRateLimitCoordinator.EstimateTokenBudget(messages, options);
         lock (_sync)
         {
-            if (_calls >= deployment.MaxCallsPerSession ||
-                _estimatedTokens + estimatedTokens > deployment.MaxEstimatedTokensPerSession)
-                throw new InvalidOperationException("This game has reached its AI usage limit.");
+            if (_calls >= deployment.MaxCallsPerSession)
+                throw new SessionAiLimitException("session_call_limit");
+            if (_estimatedTokens + estimatedTokens > deployment.MaxEstimatedTokensPerSession)
+                throw new SessionAiLimitException("session_token_limit");
             _calls++;
             _estimatedTokens += estimatedTokens;
         }
+        return estimatedTokens;
+    }
+
+    public void Release(int reservedTokens)
+    {
+        lock (_sync)
+        {
+            _calls--;
+            _estimatedTokens -= reservedTokens;
+        }
+    }
+
+    public void Reconcile(int reservedTokens, ChatResponse response)
+    {
+        UsageDetails? usage = response.Usage;
+        long? actualTokens = usage?.TotalTokenCount;
+        if (actualTokens is not > 0 && (usage?.InputTokenCount is > 0 || usage?.OutputTokenCount is > 0))
+            actualTokens = (usage.InputTokenCount ?? 0) + (usage.OutputTokenCount ?? 0);
+        if (actualTokens is not > 0) return;
+        lock (_sync)
+            _estimatedTokens = Math.Max(0, _estimatedTokens - reservedTokens + actualTokens.Value);
     }
 }
 
@@ -177,9 +214,19 @@ internal sealed class ProviderRateLimitingChatClient(
         CancellationToken cancellationToken = default)
     {
         IReadOnlyList<ChatMessage> requestMessages = Materialize(messages);
-        budget.Reserve(requestMessages, options);
-        await coordinator.WaitAsync(requestMessages, options, cancellationToken).ConfigureAwait(false);
-        return await base.GetResponseAsync(requestMessages, options, cancellationToken).ConfigureAwait(false);
+        int reservedTokens = budget.Reserve(requestMessages, options);
+        try
+        {
+            await coordinator.WaitAsync(requestMessages, options, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            budget.Release(reservedTokens);
+            throw;
+        }
+        ChatResponse response = await base.GetResponseAsync(requestMessages, options, cancellationToken).ConfigureAwait(false);
+        budget.Reconcile(reservedTokens, response);
+        return response;
     }
 
     public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -188,8 +235,16 @@ internal sealed class ProviderRateLimitingChatClient(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         IReadOnlyList<ChatMessage> requestMessages = Materialize(messages);
-        budget.Reserve(requestMessages, options);
-        await coordinator.WaitAsync(requestMessages, options, cancellationToken).ConfigureAwait(false);
+        int reservedTokens = budget.Reserve(requestMessages, options);
+        try
+        {
+            await coordinator.WaitAsync(requestMessages, options, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            budget.Release(reservedTokens);
+            throw;
+        }
         await foreach (ChatResponseUpdate update in base
                            .GetStreamingResponseAsync(requestMessages, options, cancellationToken)
                            .ConfigureAwait(false))

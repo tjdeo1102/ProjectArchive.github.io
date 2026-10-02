@@ -251,13 +251,49 @@ static async Task<IResult> WithSessionAsync(
     catch (KeyNotFoundException) { return Results.NotFound(); }
     catch (ArgumentException) { return Results.BadRequest(new { detail = "Invalid game request." }); }
     catch (OperationCanceledException) { return Results.StatusCode(StatusCodes.Status499ClientClosedRequest); }
+    catch (SessionAiLimitException exception)
+    {
+        var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("AgentFrameworkApi");
+        logger.LogWarning("Game AI limit reached: {ReasonCode}", exception.ReasonCode);
+        string detail = exception.ReasonCode == "server_daily_ai_limit"
+            ? "The server's daily AI allowance has been reached. Please try again later."
+            : "This game session has reached its AI usage limit. Start a new game to continue.";
+        return Results.Json(new
+        {
+            code = exception.ReasonCode,
+            detail
+        }, statusCode: StatusCodes.Status429TooManyRequests);
+    }
+    catch (ProviderTpmLimitException exception)
+    {
+        var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("AgentFrameworkApi");
+        logger.LogWarning("Provider TPM is below the estimated size of one game request: {ProviderName}", exception.ProviderName);
+        return Results.Json(new
+        {
+            code = "provider_tpm_too_low",
+            detail = "The selected Provider TPM is too low for this game request. Reconfigure the Provider and start a new game."
+        }, statusCode: StatusCodes.Status422UnprocessableEntity);
+    }
+    catch (ProviderQueueLimitException exception)
+    {
+        var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("AgentFrameworkApi");
+        logger.LogWarning("Provider rate queue is full: {ProviderName} {LimitName}", exception.ProviderName, exception.LimitName);
+        return Results.Json(new
+        {
+            code = "provider_rate_queue_full",
+            detail = "The selected Provider is busy. Please retry shortly."
+        }, statusCode: StatusCodes.Status429TooManyRequests);
+    }
     catch (Exception exception)
     {
         var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("AgentFrameworkApi");
         if (context.RequestServices.GetRequiredService<DeploymentOptions>().LocalDevelopment)
             logger.LogError(exception, "Game operation failed.");
         else
-            logger.LogError("Game operation failed: {ErrorType}", exception.GetType().Name);
+            logger.LogError("Game operation failed: {ErrorType} at {OriginType}.{OriginMethod}",
+                exception.GetType().Name,
+                exception.TargetSite?.DeclaringType?.Name ?? "unknown",
+                exception.TargetSite?.Name ?? "unknown");
         return Results.Json(new { detail = "Game operation failed. Please retry or restart the game." },
             statusCode: StatusCodes.Status502BadGateway);
     }
