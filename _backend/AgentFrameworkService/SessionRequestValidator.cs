@@ -10,8 +10,7 @@ internal static class SessionRequestValidator
             throw new ArgumentException("A game requires 3 to 12 agents.");
         if (request.Prompts is null || JsonSerializer.Serialize(request.Prompts).Length > 200_000)
             throw new ArgumentException("Prompt settings are missing or too large.");
-        if (request.Language is not ("ko" or "en") ||
-            (!deployment.LocalDevelopment && request.Language != "ko"))
+        if (request.Language is not ("ko" or "en"))
             throw new ArgumentException("Unsupported game language.");
         if (!deployment.LocalDevelopment && string.IsNullOrWhiteSpace(request.ProviderConfigJson))
             throw new ArgumentException("A Provider JSON file is required for this game session.");
@@ -58,7 +57,7 @@ internal static class SessionRequestValidator
         if (request.SpeakerAgentIds != null &&
             request.SpeakerAgentIds.Any(id => !request.AliveAgentIds.Contains(id, StringComparer.Ordinal)))
             throw new ArgumentException("Meeting speakers must be alive agents.");
-        if (request.Rounds is < 1 or > 4 || request.CurrentDay is < 0 or > 100)
+        if (request.Rounds is < 1 or > AdaptiveRequestBudget.MaximumMeetingStatements || request.CurrentDay is < 0 or > 100)
             throw new ArgumentException("Invalid meeting request.");
     }
 
@@ -66,11 +65,30 @@ internal static class SessionRequestValidator
     {
         ValidateOperationId(request.OperationId);
         ValidateAgentIds(request.ParticipantIds);
+        if (request.AliveAgentIds != null)
+        {
+            ValidateAgentIds(request.AliveAgentIds);
+            if (request.ParticipantIds.Any(id => !request.AliveAgentIds.Contains(id, StringComparer.Ordinal)))
+                throw new ArgumentException("Dialogue participants must be alive.");
+        }
         if (request.ParticipantIds.Count != 2 ||
             request.MinTurns is < 2 or > 6 ||
             request.MaxTurns < request.MinTurns || request.MaxTurns > 6 ||
             request.CurrentDay is < 0 or > 100)
             throw new ArgumentException("Invalid dialogue request.");
+    }
+
+    public static void Validate(AssessmentRefreshRequest request, GameSession session)
+    {
+        ValidateAgentIds(request.ActorIds);
+        ValidateAgentIds(request.AliveAgentIds);
+        if (request.CurrentDay is < 0 or > 100 || request.Phase is not ("Day" or "Meeting") ||
+            request.ActorIds.Any(id => !request.AliveAgentIds.Contains(id, StringComparer.Ordinal)) ||
+            request.AliveAgentIds.Any(id => !session.Agents.ContainsKey(id)) ||
+            (request.SceneHistory?.Count ?? 0) > 200 ||
+            (request.SceneHistory?.Any(line => line == null || line.Length > 2_000) ?? false) ||
+            (request.SceneHistory?.Sum(line => (long)line.Length) ?? 0) > 100_000)
+            throw new ArgumentException("Invalid assessment request.");
     }
 
     public static void Validate(PhaseDecisionRequest request)

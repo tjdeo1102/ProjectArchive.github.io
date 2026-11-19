@@ -186,6 +186,36 @@ routes.MapPost("/sessions/{sessionId}/dialogue", (string sessionId, DialogueRequ
         return Results.Ok(new ActionListResponse(await session.RunDialogueAsync(request, context.RequestAborted)));
     }));
 
+routes.MapPost("/sessions/{sessionId}/assessments/refresh", (string sessionId, AssessmentRefreshRequest request, HttpContext context, SessionRegistry registry) =>
+    WithSessionAsync(sessionId, context, registry, async session =>
+    {
+        SessionRequestValidator.Validate(request, session);
+        await session.RefreshAssessmentsFromEventsAsync(request, context.RequestAborted);
+        return Results.Ok(new { updated = true });
+    }));
+
+routes.MapPost("/sessions/{sessionId}/news/prepare", (string sessionId, HttpContext context, SessionRegistry registry) =>
+    WithSessionAsync(sessionId, context, registry, async session =>
+        Results.Ok(await session.PrepareNewsAsync(context.RequestAborted))));
+
+routes.MapPost("/sessions/{sessionId}/news/rumor", (string sessionId, RumorRequest request, HttpContext context, SessionRegistry registry) =>
+    WithSessionAsync(sessionId, context, registry, async session =>
+        Results.Ok(await session.PrepareRumorAsync(request, context.RequestAborted))));
+
+routes.MapGet("/sessions/{sessionId}/timing", (string sessionId, int calls, string? alive, HttpContext context, SessionRegistry registry) =>
+    WithSessionAsync(sessionId, context, registry, session =>
+    {
+        if (calls < 1 || calls > AdaptiveRequestBudget.MaximumEstimatedCalls)
+            return Task.FromResult<IResult>(Results.BadRequest());
+        try { return Task.FromResult<IResult>(Results.Ok(session.GetRequestTiming(calls, alive))); }
+        catch (ArgumentException) { return Task.FromResult<IResult>(Results.BadRequest()); }
+    }));
+
+routes.MapGet("/sessions/{sessionId}/assessments", (string sessionId, HttpContext context, SessionRegistry registry) =>
+    WithSessionAsync(sessionId, context, registry, session => Task.FromResult<IResult>(session.IsObserver
+        ? Results.Ok(new AssessmentListResponse(session.GetAssessmentViews()))
+        : Results.StatusCode(StatusCodes.Status403Forbidden))));
+
 routes.MapGet("/sessions/{sessionId}/operations/{operationId}/progress", (
     string sessionId,
     string operationId,
@@ -225,11 +255,12 @@ if (deployment.LocalDevelopment)
 {
     routes.MapGet("/sessions/{sessionId}/state", (string sessionId, HttpContext context, SessionRegistry registry) =>
         WithSessionAsync(sessionId, context, registry, session =>
-            Task.FromResult<IResult>(Results.Ok(new SessionStateResponse(sessionId, session.ExportState())))));
+            Task.FromResult<IResult>(session.IsObserver ? Results.Ok(new SessionStateResponse(sessionId, session.ExportState())) : Results.StatusCode(StatusCodes.Status403Forbidden))));
 
     routes.MapPut("/sessions/{sessionId}/state", (string sessionId, LoadSessionStateRequest request, HttpContext context, SessionRegistry registry) =>
         WithSessionAsync(sessionId, context, registry, async session =>
         {
+            if (!session.IsObserver) return Results.StatusCode(StatusCodes.Status403Forbidden);
             await session.LoadStateAsync(request.State, context.RequestAborted);
             return Results.NoContent();
         }));

@@ -60,14 +60,22 @@ public sealed record PromptSet(
     [property: JsonPropertyName("citizen_role_guidance")] string CitizenRoleGuidance,
     [property: JsonPropertyName("strategy_default")] string StrategyDefault,
     [property: JsonPropertyName("participant_profile")] string ParticipantProfile,
-    [property: JsonPropertyName("history_entry")] string HistoryEntry);
+    [property: JsonPropertyName("history_entry")] string HistoryEntry,
+    [property: JsonPropertyName("assessment")] string Assessment = "",
+    [property: JsonPropertyName("moderator_news")] string ModeratorNews = "",
+    [property: JsonPropertyName("moderator_news_system")] string ModeratorNewsSystem = "",
+    [property: JsonPropertyName("moderator_private_hint_profile")] string ModeratorPrivateHintProfile = "",
+    [property: JsonPropertyName("moderator_rumor_task")] string ModeratorRumorTask = "",
+    [property: JsonPropertyName("moderator_news_limit")] string ModeratorNewsLimit = "",
+    [property: JsonPropertyName("assessment_abstention")] string AssessmentAbstention = "");
 
 public sealed record CreateSessionRequest(
     [property: JsonPropertyName("session_id")] string SessionId,
     [property: JsonPropertyName("language")] string Language,
     [property: JsonPropertyName("provider_config_json")] string ProviderConfigJson,
     [property: JsonPropertyName("prompts")] PromptSet Prompts,
-    [property: JsonPropertyName("agents")] List<AgentSpec> Agents);
+    [property: JsonPropertyName("agents")] List<AgentSpec> Agents,
+    [property: JsonPropertyName("is_observer")] bool IsObserver = false);
 
 public sealed record SessionResponse(
     [property: JsonPropertyName("session_id")] string SessionId,
@@ -92,6 +100,43 @@ public sealed class AgentAction
     [JsonPropertyName("target_x")] public float TargetX { get; set; }
     [JsonPropertyName("target_z")] public float TargetZ { get; set; }
 }
+
+public sealed class AssessmentScore
+{
+    [JsonPropertyName("target_id")] public string TargetId { get; set; } = "";
+    [JsonPropertyName("probability")] public double Probability { get; set; }
+}
+
+public sealed class AgentAssessment
+{
+    [JsonPropertyName("scores")] public List<AssessmentScore> Scores { get; set; } = new();
+}
+
+public sealed class TownNewsItem
+{
+    [JsonPropertyName("genre")] public string Genre { get; set; } = "";
+    [JsonPropertyName("headline")] public string Headline { get; set; } = "";
+    [JsonPropertyName("body")] public string Body { get; set; } = "";
+}
+
+public sealed class TownNewsBatch
+{
+    [JsonPropertyName("arrival_story")] public string ArrivalStory { get; set; } = "";
+    [JsonPropertyName("favorite_food_hint")] public string FavoriteFoodHint { get; set; } = "";
+    [JsonPropertyName("hobby_hint")] public string HobbyHint { get; set; } = "";
+    [JsonPropertyName("items")] public List<TownNewsItem> Items { get; set; } = new();
+}
+
+public sealed record RumorRequest([property: JsonPropertyName("quotes")] List<string> Quotes);
+public sealed record RumorResponse([property: JsonPropertyName("article")] string Article);
+
+public sealed record AssessmentView(
+    [property: JsonPropertyName("actor_id")] string ActorId,
+    [property: JsonPropertyName("is_mafia")] bool IsMafia,
+    [property: JsonPropertyName("scores")] List<AssessmentScore> Scores);
+
+public sealed record AssessmentListResponse(
+    [property: JsonPropertyName("boards")] List<AssessmentView> Boards);
 
 public sealed record AgentActionRequest(
     [property: JsonPropertyName("operation_id")] string OperationId,
@@ -121,13 +166,21 @@ public sealed record DialogueRequest(
     [property: JsonPropertyName("participant_ids")] List<string> ParticipantIds,
     [property: JsonPropertyName("current_day")] int CurrentDay,
     [property: JsonPropertyName("min_turns")] int MinTurns,
-    [property: JsonPropertyName("max_turns")] int MaxTurns);
+    [property: JsonPropertyName("max_turns")] int MaxTurns,
+    [property: JsonPropertyName("alive_agent_ids")] List<string>? AliveAgentIds = null);
 
 public sealed record PhaseDecisionRequest(
     [property: JsonPropertyName("operation_id")] string OperationId,
     [property: JsonPropertyName("alive_agent_ids")] List<string> AliveAgentIds,
     [property: JsonPropertyName("acting_agent_ids")] List<string>? ActingAgentIds,
     [property: JsonPropertyName("current_day")] int CurrentDay);
+
+public sealed record AssessmentRefreshRequest(
+    [property: JsonPropertyName("actor_ids")] List<string> ActorIds,
+    [property: JsonPropertyName("alive_agent_ids")] List<string> AliveAgentIds,
+    [property: JsonPropertyName("current_day")] int CurrentDay,
+    [property: JsonPropertyName("phase")] string Phase,
+    [property: JsonPropertyName("scene_history")] List<string>? SceneHistory = null);
 
 public sealed record ActionListResponse(
     [property: JsonPropertyName("actions")] List<AgentAction> Actions);
@@ -155,4 +208,5 @@ public sealed record LoadSessionStateRequest(
 
 public sealed record SessionState(
     [property: JsonPropertyName("events")] Dictionary<string, List<GameEventRequest>> Events,
-    [property: JsonPropertyName("transcripts")] Dictionary<string, List<string>> Transcripts);
+    [property: JsonPropertyName("transcripts")] Dictionary<string, List<string>> Transcripts,
+    [property: JsonPropertyName("assessments")] Dictionary<string, Dictionary<string, double>>? Assessments = null);

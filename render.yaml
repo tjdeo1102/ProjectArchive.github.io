@@ -21,8 +21,8 @@ services:
       - key: AGENT_FRAMEWORK_SESSION_IDLE_MINUTES
         value: "10"
       - key: AGENT_FRAMEWORK_MAX_CALLS_PER_SESSION
-        value: "80"
+        value: "300"
       - key: AGENT_FRAMEWORK_MAX_TOKENS_PER_SESSION
-        value: "30000"
+        value: "1000000"
       - key: AGENT_FRAMEWORK_MAX_OUTPUT_TOKENS
-        value: "1024"
+        value: "2048"

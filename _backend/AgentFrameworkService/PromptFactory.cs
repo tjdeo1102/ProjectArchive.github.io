@@ -5,6 +5,17 @@ namespace MafiaSimulation.AgentFrameworkService;
 
 internal static partial class PromptFactory
 {
+    public static string BuildModeratorNewsTask(PromptSet prompts, AgentSpec mafia, int? maxOutputTokens = null)
+    {
+        int maxItems = Math.Clamp((maxOutputTokens.GetValueOrDefault(512) - 160) / 100, 1, 20);
+        var values = new Dictionary<string, string>
+        {
+            ["mafiaPersonality"] = ValueOrDefault(mafia.Persona, prompts.DefaultPersona),
+            ["environment"] = prompts.Environment,
+            ["maxNewsItems"] = maxItems.ToString(CultureInfo.InvariantCulture)
+        };
+        return Join(Render(prompts.ModeratorNews, values), Render(prompts.ModeratorNewsLimit, values));
+    }
     public static string BuildAgentInstructions(AgentSpec spec, PromptSet prompts, string language)
     {
         string role = spec.IsMafia ? prompts.MafiaRoleLabel : prompts.CitizenRoleLabel;
@@ -108,7 +119,8 @@ internal static partial class PromptFactory
             {
                 ["agentId"] = participant.AgentId,
                 ["agentName"] = participant.AgentName,
-                ["personaProfile"] = ValueOrDefault(participant.Persona, prompts.DefaultPersona)
+                // Shared scene descriptions must not include private roles or strategies.
+                ["personaProfile"] = string.Empty
             })));
         string previousDialogueText = string.Join("\n", previousDialogue.Select(line =>
             Render(prompts.HistoryEntry, new Dictionary<string, string> { ["content"] = line })));
@@ -153,6 +165,22 @@ internal static partial class PromptFactory
         return Render(prompts.PhaseContext, values);
     }
 
+    public static string BuildAssessmentTask(PromptSet prompts, IReadOnlyList<string> candidates,
+        IReadOnlyDictionary<string, double> previousScores, IReadOnlyList<string> sceneHistory,
+        IReadOnlyList<GameEventRequest> memories)
+    {
+        var values = new Dictionary<string, string>
+        {
+            ["candidateList"] = string.Join(", ", candidates),
+            ["previousScores"] = string.Join(", ", previousScores.Select(pair =>
+                $"{pair.Key}: {pair.Value.ToString("F2", CultureInfo.InvariantCulture)}")),
+            ["sceneHistory"] = string.Join("\n", sceneHistory),
+            ["memoryBlock"] = BuildMemoryBlock(prompts, memories),
+            ["abstainTarget"] = AssessmentBoard.AbstainTarget
+        };
+        return Join(Render(prompts.Assessment, values), Render(prompts.AssessmentAbstention, values));
+    }
+
     private static Dictionary<string, string> CommonValues(string targetId, string targetName, string message) => new()
     {
         ["targetId"] = targetId,
@@ -191,6 +219,9 @@ internal static partial class PromptFactory
                 ["day"] = memory.Day.ToString(CultureInfo.InvariantCulture),
                 ["phase"] = memory.Phase,
                 ["tag"] = memory.Tag,
+                ["ownerId"] = memory.OwnerAgentId,
+                ["targetId"] = memory.TargetAgentId,
+                ["visibility"] = memory.Visibility,
                 ["content"] = memory.Content
             })));
         return Join(prompts.MemoryHeader, entries);

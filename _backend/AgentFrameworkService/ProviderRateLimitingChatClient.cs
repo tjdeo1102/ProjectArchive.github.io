@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading.RateLimiting;
 using Microsoft.Extensions.AI;
@@ -256,28 +257,49 @@ internal sealed class ProviderRateLimitingChatClient(
     {
         IReadOnlyList<ChatMessage> requestMessages = Materialize(messages);
         int reservedTokens = budget.Reserve(requestMessages, options);
+        var timer = Stopwatch.StartNew();
+        long rateWaitMs = 0;
+        bool rateReady = false;
+        string outcome = "cancelled";
         try
         {
-            await coordinator.WaitAsync(requestMessages, options, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await coordinator.WaitAsync(requestMessages, options, cancellationToken).ConfigureAwait(false);
+                rateWaitMs = timer.ElapsedMilliseconds;
+                rateReady = true;
+            }
+            catch
+            {
+                budget.Release(reservedTokens);
+                throw;
+            }
+            ChatResponse response;
+            try
+            {
+                using var callTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                callTimeout.CancelAfter(TimeSpan.FromSeconds(AdaptiveRequestBudget.ModelCallTimeoutSeconds));
+                try { response = await base.GetResponseAsync(requestMessages, options, callTimeout.Token).ConfigureAwait(false); }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                { throw new TimeoutException("Provider response exceeded its model-call deadline."); }
+            }
+            catch
+            {
+                // The Provider might have billed a failed request, so retain its reservation.
+                budget.RecordFailure();
+                throw;
+            }
+            budget.Reconcile(reservedTokens, response);
+            outcome = "success";
+            return response;
         }
-        catch
+        catch (TimeoutException) { outcome = "timeout"; throw; }
+        catch (Exception e) when (e is not OperationCanceledException) { outcome = "failed"; throw; }
+        finally
         {
-            budget.Release(reservedTokens);
-            throw;
+            if (!rateReady) rateWaitMs = timer.ElapsedMilliseconds;
+            Console.WriteLine($"[Provider timing] rate_wait_ms={rateWaitMs} model_ms={timer.ElapsedMilliseconds - rateWaitMs} outcome={outcome}");
         }
-        ChatResponse response;
-        try
-        {
-            response = await base.GetResponseAsync(requestMessages, options, cancellationToken).ConfigureAwait(false);
-        }
-        catch
-        {
-            // The Provider might have billed a failed request, so retain its reservation.
-            budget.RecordFailure();
-            throw;
-        }
-        budget.Reconcile(reservedTokens, response);
-        return response;
     }
 
     public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -287,6 +309,7 @@ internal sealed class ProviderRateLimitingChatClient(
     {
         IReadOnlyList<ChatMessage> requestMessages = Materialize(messages);
         int reservedTokens = budget.Reserve(requestMessages, options);
+        var timer = Stopwatch.StartNew();
         try
         {
             await coordinator.WaitAsync(requestMessages, options, cancellationToken).ConfigureAwait(false);
@@ -296,12 +319,15 @@ internal sealed class ProviderRateLimitingChatClient(
             budget.Release(reservedTokens);
             throw;
         }
+        long rateWaitMs = timer.ElapsedMilliseconds;
+        using var callTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        callTimeout.CancelAfter(TimeSpan.FromSeconds(AdaptiveRequestBudget.ModelCallTimeoutSeconds));
         UsageDetails? usage = null;
         bool completed = false;
         try
         {
             await foreach (ChatResponseUpdate update in base
-                               .GetStreamingResponseAsync(requestMessages, options, cancellationToken)
+                               .GetStreamingResponseAsync(requestMessages, options, callTimeout.Token)
                                .ConfigureAwait(false))
             {
                 foreach (AIContent content in update.Contents)
@@ -314,6 +340,7 @@ internal sealed class ProviderRateLimitingChatClient(
         {
             if (completed) budget.Reconcile(reservedTokens, usage);
             else budget.RecordFailure();
+            Console.WriteLine($"[Provider timing] rate_wait_ms={rateWaitMs} model_ms={timer.ElapsedMilliseconds - rateWaitMs} outcome={(completed ? "success" : "incomplete")}");
         }
     }
 

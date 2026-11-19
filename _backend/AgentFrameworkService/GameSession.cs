@@ -13,6 +13,8 @@ internal sealed class AgentRuntime : IAsyncDisposable
     public required AgentSession Session { get; init; }
     public required IChatClient ChatClient { get; init; }
     public required ChatClientAgentRunOptions RunOptions { get; init; }
+    public required ChatClientAgentRunOptions AssessmentOptions { get; init; }
+    public required ChatClientAgentRunOptions NewsOptions { get; init; }
     public bool IsAvailable { get; set; }
     public string UnavailableReason { get; set; } = "";
 
@@ -58,13 +60,20 @@ internal sealed class GameSession : IAsyncDisposable
     private string DataDirectory => _deployment.DataDirectory;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly SemaphoreSlim _storageGate = new(1, 1);
+    private readonly SemaphoreSlim _responseLogGate = new(1, 1);
+    private readonly AgentWorkScheduler _scheduler = new();
     private readonly object _memorySync = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _operations = new();
     private readonly ConcurrentDictionary<string, OperationProgress> _operationProgress = new();
     private readonly ConcurrentDictionary<string, ConcurrentQueue<string>> _dialogueHistory = new();
     private readonly Dictionary<string, List<GameEventRequest>> _events;
     private readonly Dictionary<string, List<string>> _transcripts;
+    private readonly Dictionary<string, AssessmentBoard> _assessments;
     private int _eventCount;
+    private TownNewsBatch? _newsBatch;
+    private bool _newsAttempted;
+    private bool _rumorAttempted;
+    private string _preparedRumor = "";
     private readonly IReadOnlyCollection<ProviderRateLimitCoordinator> _providerRateLimiters;
     private readonly bool _ownsRateLimiters;
 
@@ -88,9 +97,11 @@ internal sealed class GameSession : IAsyncDisposable
         _ownsRateLimiters = ownsRateLimiters;
         _events = agents.Keys.ToDictionary(id => id, _ => new List<GameEventRequest>());
         _transcripts = agents.Keys.ToDictionary(id => id, _ => new List<string>());
+        _assessments = agents.Keys.ToDictionary(id => id, _ => new AssessmentBoard());
     }
 
     public string SessionId { get; }
+    public bool IsObserver { get; private set; }
     public string Language { get; }
     public PromptSet Prompts { get; }
     public Dictionary<string, AgentRuntime> Agents { get; }
@@ -104,6 +115,8 @@ internal sealed class GameSession : IAsyncDisposable
     {
         if (string.IsNullOrWhiteSpace(request.SessionId)) throw new ArgumentException("session_id is required.");
         if (request.Agents.Count == 0) throw new ArgumentException("At least one agent is required.");
+        if (request.Agents.Any(agent => agent.AgentId == AssessmentBoard.AbstainTarget))
+            throw new ArgumentException("Agent ID is reserved.");
 
         ProviderCollection collection = ProviderFactory.ReadCollection(request.ProviderConfigJson, deployment);
         Dictionary<string, ProviderConfig> providers = collection.Providers
@@ -144,12 +157,18 @@ internal sealed class GameSession : IAsyncDisposable
                     .Create(provider, spec.ModelOverride, deployment)
                     .UseProviderRateLimits(rateLimiters[providerName], sessionBudget);
                 ChatOptions chatOptions = ProviderFactory.BuildChatOptions(provider, deployment);
+                ChatOptions assessmentOptions = ProviderFactory.BuildChatOptions(provider, deployment);
+                assessmentOptions.ResponseFormat = ChatResponseFormat.ForJsonSchema<AgentAssessment>(JsonDefaults.Options, "agent_assessment", "Candidate judgments");
+                ChatOptions newsOptions = ProviderFactory.BuildChatOptions(provider, deployment);
+                newsOptions.ResponseFormat = ChatResponseFormat.ForJsonSchema<TownNewsBatch>(JsonDefaults.Options, "town_news_batch", "Prepared village news");
+                newsOptions.Instructions = request.Prompts.ModeratorNewsSystem;
                 chatOptions.Instructions = PromptFactory.BuildAgentInstructions(spec, request.Prompts, request.Language);
                 var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
                 {
                     Id = spec.AgentId,
                     Name = SafeAgentName(spec.AgentId),
                     Description = $"Mafia game participant {spec.AgentName}",
+                    ChatHistoryProvider = AgentContextPolicy.CreateHistory(),
                     ChatOptions = chatOptions
                 });
                 AgentSession agentSession = await agent.CreateSessionAsync(cancellationToken);
@@ -161,6 +180,8 @@ internal sealed class GameSession : IAsyncDisposable
                     Session = agentSession,
                     ChatClient = chatClient,
                     RunOptions = new ChatClientAgentRunOptions(chatOptions),
+                    AssessmentOptions = new ChatClientAgentRunOptions(assessmentOptions),
+                    NewsOptions = new ChatClientAgentRunOptions(newsOptions),
                     IsAvailable = isAvailable,
                     UnavailableReason = isAvailable ? "" : "provider_preflight_failed"
                 });
@@ -175,6 +196,7 @@ internal sealed class GameSession : IAsyncDisposable
                 rateLimiters.Values,
                 ownsRateLimiters,
                 deployment);
+            session.IsObserver = request.IsObserver;
             await session.ResetPersistentStateAsync(cancellationToken);
             return session;
         }
@@ -187,10 +209,85 @@ internal sealed class GameSession : IAsyncDisposable
         }
     }
 
+    public async Task<TownNewsBatch> PrepareNewsAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_newsAttempted) return _newsBatch ?? new TownNewsBatch();
+            _newsAttempted = true;
+            AgentRuntime? runtime = Agents.Values.FirstOrDefault(agent => agent.IsAvailable);
+            AgentSpec? mafia = Agents.Values.Select(agent => agent.Spec).FirstOrDefault(agent => agent.IsMafia);
+            if (runtime == null || mafia == null || string.IsNullOrWhiteSpace(Prompts.ModeratorNews))
+                return _newsBatch = new TownNewsBatch();
+            try
+            {
+                var moderator = new ChatClientAgent(runtime.ChatClient, new ChatClientAgentOptions
+                {
+                    Id = "town_moderator",
+                    Name = "TownModerator",
+                    ChatOptions = runtime.NewsOptions.ChatOptions
+                });
+                AgentSession moderatorSession = await moderator.CreateSessionAsync(cancellationToken);
+                AgentResponse<TownNewsBatch> response = await moderator.RunAsync<TownNewsBatch>(
+                    PromptFactory.BuildModeratorNewsTask(Prompts, mafia, runtime.NewsOptions.ChatOptions?.MaxOutputTokens), moderatorSession,
+                    JsonDefaults.Options, runtime.NewsOptions, cancellationToken);
+                _newsBatch = TownNewsValidation.Filter(response.Result, Agents.Values.Select(a => a.Spec));
+                if (!string.IsNullOrWhiteSpace(Prompts.ModeratorPrivateHintProfile) &&
+                    (!string.IsNullOrWhiteSpace(_newsBatch.FavoriteFoodHint) || !string.IsNullOrWhiteSpace(_newsBatch.HobbyHint)))
+                {
+                    string profile = Prompts.ModeratorPrivateHintProfile
+                        .Replace("{food}", _newsBatch.FavoriteFoodHint)
+                        .Replace("{hobby}", _newsBatch.HobbyHint);
+                    await RecordEventAsync(new GameEventRequest(mafia.AgentId, "", profile, "private", 0, "Setup", "System"), cancellationToken);
+                }
+                await LogResponseAsync(new AgentAction { ActorId = "System", Action = "NEWS_PREPARE" }, response, "news_prepare", cancellationToken);
+                return _newsBatch;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception exception)
+            {
+                Console.Error.WriteLine($"Moderator news preparation failed: {exception.GetType().Name}");
+                return _newsBatch = new TownNewsBatch();
+            }
+        }
+        finally { _gate.Release(); }
+    }
+
+    public async Task<RumorResponse> PrepareRumorAsync(RumorRequest request, CancellationToken cancellationToken)
+    {
+        if (request?.Quotes == null || request.Quotes.Count > 20 || request.Quotes.Any(q => q == null || q.Length > 200))
+            throw new ArgumentException("Invalid rumor source material.");
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_rumorAttempted) return new RumorResponse(_preparedRumor);
+            _rumorAttempted = true;
+            AgentRuntime? runtime = Agents.Values.FirstOrDefault(agent => agent.IsAvailable);
+            if (runtime == null || request.Quotes.Count == 0 || string.IsNullOrWhiteSpace(Prompts.ModeratorRumorTask))
+                return new RumorResponse("");
+            try
+            {
+                var moderator = new ChatClientAgent(runtime.ChatClient, new ChatClientAgentOptions
+                { Id = "town_rumor_moderator", Name = "TownRumorModerator", ChatOptions = runtime.NewsOptions.ChatOptions });
+                AgentSession moderatorSession = await moderator.CreateSessionAsync(cancellationToken);
+                string task = Prompts.ModeratorRumorTask.Replace("{quotes}", string.Join("\n", request.Quotes));
+                AgentResponse<TownNewsBatch> response = await moderator.RunAsync<TownNewsBatch>(task, moderatorSession,
+                    JsonDefaults.Options, runtime.NewsOptions, cancellationToken);
+                TownNewsItem? article = TownNewsValidation.Filter(response.Result, Agents.Values.Select(a => a.Spec)).Items.FirstOrDefault();
+                if (article != null) _preparedRumor = $"{article.Headline} — {article.Body}";
+                await LogResponseAsync(new AgentAction { ActorId = "System", Action = "RUMOR_PREPARE" }, response, "rumor_prepare", cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception exception) { Console.Error.WriteLine($"Moderator rumor preparation failed: {exception.GetType().Name}"); }
+            return new RumorResponse(_preparedRumor);
+        }
+        finally { _gate.Release(); }
+    }
+
     public async Task<AgentAction> RunAgentActionAsync(AgentActionRequest request, CancellationToken requestAborted)
     {
-        await _gate.WaitAsync(requestAborted);
-        try
+        return await _scheduler.RunAsync(request.AgentId, async workToken =>
         {
             if (request.ActionType == "talk_decision" && request.RecentPartner)
             {
@@ -212,7 +309,7 @@ internal sealed class GameSession : IAsyncDisposable
                     request.ActionType,
                     requestAborted);
 
-            using CancellationTokenSource operation = BeginOperation(request.OperationId, requestAborted);
+            using CancellationTokenSource operation = BeginOperation(request.OperationId, workToken);
             try
             {
                 try
@@ -244,11 +341,7 @@ internal sealed class GameSession : IAsyncDisposable
             {
                 EndOperation(request.OperationId);
             }
-        }
-        finally
-        {
-            _gate.Release();
-        }
+        }, requestAborted);
     }
 
     public Task<List<AgentAction>> RunMeetingAsync(MeetingRequest request, CancellationToken cancellationToken)
@@ -257,8 +350,8 @@ internal sealed class GameSession : IAsyncDisposable
         return RunGroupChatAsync(
             request.OperationId,
             speakerIds,
-            PromptFactory.BuildMeetingTask(Prompts, request.AliveAgentIds, request.CurrentDay, Math.Clamp(request.Rounds, 1, 4)),
-            Math.Max(1, speakerIds.Count * Math.Clamp(request.Rounds, 1, 4)),
+            PromptFactory.BuildMeetingTask(Prompts, request.AliveAgentIds, request.CurrentDay, Math.Clamp(request.Rounds, 1, AdaptiveRequestBudget.MaximumMeetingStatements)),
+            Math.Max(1, speakerIds.Count * Math.Clamp(request.Rounds, 1, AdaptiveRequestBudget.MaximumMeetingStatements)),
             "meeting",
             cancellationToken);
     }
@@ -293,7 +386,61 @@ internal sealed class GameSession : IAsyncDisposable
         {
             action.TargetId = request.ParticipantIds.FirstOrDefault(id => id != action.ActorId) ?? "";
         }
+        if (actions.Count >= 2 && request.ParticipantIds.All(id => GetRuntime(id).IsAvailable) &&
+            actions.All(action => !string.IsNullOrWhiteSpace(action.DialogueContent)))
+            await RefreshAssessmentsAsync(request.ParticipantIds, request.AliveAgentIds ?? Agents.Keys.ToList(),
+                actions.Select(action => $"{action.ActorId}: {action.DialogueContent}").ToList(), cancellationToken);
         return actions.Take(maximumTurns).ToList();
+    }
+
+    public async Task RefreshAssessmentsAsync(IReadOnlyList<string> actorIds, IReadOnlyList<string> aliveIds,
+        IReadOnlyList<string> sceneHistory, CancellationToken cancellationToken)
+    {
+        foreach (string id in actorIds.Distinct(StringComparer.Ordinal))
+        {
+            if (!Agents.TryGetValue(id, out AgentRuntime? runtime) || !runtime.IsAvailable ||
+                string.IsNullOrWhiteSpace(Prompts.Assessment)) continue;
+            try
+            {
+                IReadOnlyDictionary<string, double> previous;
+                lock (_memorySync) previous = _assessments[id].Snapshot();
+                string task = PromptFactory.BuildAssessmentTask(Prompts, aliveIds, previous, sceneHistory, MemoriesFor(id));
+                AgentResponse<AgentAssessment> response = await _scheduler.RunAsync(id,
+                    token => runtime.Agent.RunAsync<AgentAssessment>(
+                        task, runtime.Session, JsonDefaults.Options, runtime.AssessmentOptions, token), cancellationToken);
+                if (response.Result?.Scores == null) continue;
+                lock (_memorySync) _assessments[id].Update(response.Result.Scores, aliveIds, id);
+                await LogResponseAsync(new AgentAction { ActorId = id, Action = "ASSESSMENT" }, response, "assessment", cancellationToken);
+                await SaveAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception exception)
+            {
+                if (IsProviderFailure(exception, cancellationToken)) MarkProviderUnavailable(runtime.ProviderName, exception);
+                Console.Error.WriteLine($"Assessment update failed for {id}: {exception.GetType().Name}");
+            }
+        }
+    }
+
+    public async Task RefreshAssessmentsFromEventsAsync(AssessmentRefreshRequest request, CancellationToken cancellationToken)
+    {
+        foreach (string actorId in request.ActorIds.Distinct(StringComparer.Ordinal))
+        {
+            var history = request.SceneHistory ?? MemoriesFor(actorId)
+                .Where(entry => entry.Day == request.CurrentDay &&
+                    entry.Phase.Equals(request.Phase, StringComparison.OrdinalIgnoreCase) &&
+                    (entry.Tag.Equals("Discussion", StringComparison.OrdinalIgnoreCase) || entry.Tag.Equals("Dialogue", StringComparison.OrdinalIgnoreCase)))
+                .Select(entry => $"{entry.OwnerAgentId}: {entry.Content}").ToList();
+            await RefreshAssessmentsAsync(new[] { actorId }, request.AliveAgentIds, history, cancellationToken);
+        }
+    }
+
+    public List<AssessmentView> GetAssessmentViews()
+    {
+        lock (_memorySync)
+            return Agents.Values.Select(runtime => new AssessmentView(runtime.Spec.AgentId, runtime.Spec.IsMafia,
+                _assessments[runtime.Spec.AgentId].Snapshot().Where(pair => pair.Key != AssessmentBoard.AbstainTarget).OrderByDescending(pair => pair.Value)
+                    .Select(pair => new AssessmentScore { TargetId = pair.Key, Probability = pair.Value }).ToList())).ToList();
     }
 
     public async Task<List<AgentAction>> RunPhaseAsync(PhaseDecisionRequest request, string phase, CancellationToken requestAborted)
@@ -310,38 +457,19 @@ internal sealed class GameSession : IAsyncDisposable
                 {
                     AgentRuntime runtime = GetRuntime(agentId);
                     if (phase == "night" && !runtime.Spec.IsMafia) continue;
-                    if (!runtime.IsAvailable)
+                    var eligible = request.AliveAgentIds.Where(id => Agents.TryGetValue(id, out AgentRuntime? target) &&
+                        (phase != "night" || !target.Spec.IsMafia)).ToList();
+                    string targetId;
+                    lock (_memorySync) targetId = _assessments[agentId].Select(eligible, agentId);
+                    var action = new AgentAction
                     {
-                        AgentAction fallback = BuildFallbackAction(agentId, phase, "");
-                        actions.Add(fallback);
-                        AddTranscript(fallback);
-                        await LogResponseAsync(fallback, null, phase, requestAborted);
-                        continue;
-                    }
-                    string prompt = phase == "voting" ? Prompts.Voting : Prompts.Night;
-                    string task = PromptFactory.BuildPhaseTask(Prompts, prompt, phase, agentId, request.AliveAgentIds, request.CurrentDay, MemoriesFor(agentId));
-                    try
-                    {
-                        AgentResponse<AgentAction> response = await runtime.Agent.RunAsync<AgentAction>(
-                            task, runtime.Session, JsonDefaults.Options, runtime.RunOptions, operation.Token);
-                        AgentAction action = response.Result ?? throw new InvalidOperationException("Agent Framework returned no AgentAction.");
-                        action.ActorId = agentId;
-                        actions.Add(action);
-                        AddTranscript(action);
-                        await LogResponseAsync(action, response, phase, operation.Token);
-                    }
-                    catch (OperationCanceledException) when (operation.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    catch (Exception exception) when (IsProviderFailure(exception, requestAborted))
-                    {
-                        MarkProviderUnavailable(runtime.ProviderName, exception);
-                        AgentAction fallback = BuildFallbackAction(agentId, phase, "");
-                        actions.Add(fallback);
-                        AddTranscript(fallback);
-                        await LogResponseAsync(fallback, null, phase, requestAborted);
-                    }
+                        ActorId = agentId,
+                        TargetId = targetId,
+                        Action = string.IsNullOrEmpty(targetId) ? "NONE" : phase == "voting" ? "VOTE" : "EXECUTE"
+                    };
+                    actions.Add(action);
+                    AddTranscript(action);
+                    await LogResponseAsync(action, null, phase, operation.Token);
                 }
                 await SaveAsync(operation.Token);
                 return actions;
@@ -360,6 +488,13 @@ internal sealed class GameSession : IAsyncDisposable
     public async Task RecordEventAsync(GameEventRequest gameEvent, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        string visibility = (gameEvent.Visibility ?? "").Trim().ToLowerInvariant();
+        if (visibility is not ("private" or "public" or "discussion"))
+            throw new ArgumentException("Invalid event visibility.");
+        string recipientId = gameEvent.OwnerAgentId ?? "";
+        if (visibility == "private" && !Agents.ContainsKey(recipientId))
+            throw new ArgumentException("Private event recipient is unknown.");
+        gameEvent = gameEvent with { Visibility = visibility };
         if (Interlocked.Increment(ref _eventCount) > 2_000)
         {
             Interlocked.Decrement(ref _eventCount);
@@ -367,8 +502,8 @@ internal sealed class GameSession : IAsyncDisposable
         }
         lock (_memorySync)
         {
-            IEnumerable<string> recipients = gameEvent.Visibility == "private"
-                ? new[] { gameEvent.OwnerAgentId }.Where(Agents.ContainsKey)
+            IEnumerable<string> recipients = visibility == "private"
+                ? new[] { recipientId }
                 : Agents.Keys;
             foreach (string id in recipients) _events[id].Add(gameEvent);
         }
@@ -380,6 +515,25 @@ internal sealed class GameSession : IAsyncDisposable
         if (!_operations.TryGetValue(operationId, out CancellationTokenSource? source)) return false;
         source.Cancel();
         return true;
+    }
+
+    public RequestTimingResponse GetRequestTiming(int calls, string? alive = null)
+    {
+        if (calls < 1 || calls > AdaptiveRequestBudget.MaximumEstimatedCalls) throw new ArgumentException("Invalid estimated call count.");
+        var aliveIds = string.IsNullOrWhiteSpace(alive) ? Agents.Keys.ToHashSet(StringComparer.Ordinal) :
+            alive.Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);
+        if (aliveIds.Count > 32 || aliveIds.Any(id => !Agents.ContainsKey(id))) throw new ArgumentException("Invalid active roster.");
+        int budget = AdaptiveRequestBudget.MinimumSeconds, queue = 0, providerNpcCount = 0;
+        foreach (var group in Agents.Values.Where(a => aliveIds.Contains(a.Spec.AgentId)).GroupBy(a => a.ProviderName, StringComparer.OrdinalIgnoreCase))
+        {
+            var limiter = _providerRateLimiters.FirstOrDefault(l => l.ProviderName.Equals(group.Key, StringComparison.OrdinalIgnoreCase));
+            int outstanding = _scheduler.QueuedFor(group.Select(a => a.Spec.AgentId));
+            queue += outstanding;
+            providerNpcCount = Math.Max(providerNpcCount, group.Count());
+            budget = Math.Max(budget, AdaptiveRequestBudget.Calculate(group.Count(), outstanding, calls,
+                limiter?.RequestsPerMinute ?? 0, limiter?.TokensPerMinute ?? 0));
+        }
+        return new RequestTimingResponse(budget, queue, providerNpcCount);
     }
 
     public OperationProgressResponse GetOperationProgress(string operationId, int offset)
@@ -395,7 +549,8 @@ internal sealed class GameSession : IAsyncDisposable
         {
             return new SessionState(
                 _events.ToDictionary(pair => pair.Key, pair => pair.Value.ToList()),
-                _transcripts.ToDictionary(pair => pair.Key, pair => pair.Value.ToList()));
+                _transcripts.ToDictionary(pair => pair.Key, pair => pair.Value.ToList()),
+                _assessments.ToDictionary(pair => pair.Key, pair => new Dictionary<string, double>(pair.Value.Snapshot())));
         }
     }
 
@@ -408,6 +563,9 @@ internal sealed class GameSession : IAsyncDisposable
             {
                 _events[id] = state.Events.GetValueOrDefault(id)?.ToList() ?? new();
                 _transcripts[id] = state.Transcripts.GetValueOrDefault(id)?.ToList() ?? new();
+                _assessments[id].Clear();
+                if (state.Assessments?.TryGetValue(id, out Dictionary<string, double>? scores) == true)
+                    _assessments[id].Update(scores.Select(pair => new AssessmentScore { TargetId = pair.Key, Probability = pair.Value }), Agents.Keys, id);
             }
         }
         await SaveAsync(cancellationToken);
@@ -466,11 +624,8 @@ internal sealed class GameSession : IAsyncDisposable
                 AgentRuntime runtime = availableRuntimes[iteration % availableRuntimes.Count];
                 AgentAction action;
                 AgentResponse<AgentAction>? response = null;
-                bool gateEntered = false;
                 try
                 {
-                    await _gate.WaitAsync(operation.Token);
-                    gateEntered = true;
                     if (!runtime.IsAvailable)
                     {
                         action = BuildFallbackAction(runtime.Spec.AgentId, responseType, "");
@@ -483,12 +638,9 @@ internal sealed class GameSession : IAsyncDisposable
                             runtime.Spec,
                             MemoriesFor(runtime.Spec.AgentId),
                             currentSceneHistory);
-                        response = await runtime.Agent.RunAsync<AgentAction>(
-                            turnTask,
-                            runtime.Session,
-                            JsonDefaults.Options,
-                            runtime.RunOptions,
-                            operation.Token);
+                        response = await _scheduler.RunAsync(runtime.Spec.AgentId,
+                            token => runtime.Agent.RunAsync<AgentAction>(turnTask, runtime.Session,
+                                JsonDefaults.Options, runtime.RunOptions, token), operation.Token);
                         action = response.Result ?? throw new InvalidOperationException("Agent Framework returned no AgentAction.");
                     }
                 }
@@ -503,10 +655,6 @@ internal sealed class GameSession : IAsyncDisposable
                         ? participantIds.FirstOrDefault(id => id != runtime.Spec.AgentId) ?? ""
                         : "";
                     action = BuildFallbackAction(runtime.Spec.AgentId, responseType, failedTargetId);
-                }
-                finally
-                {
-                    if (gateEntered) _gate.Release();
                 }
 
                 action.ActorId = runtime.Spec.AgentId;
@@ -624,21 +772,25 @@ internal sealed class GameSession : IAsyncDisposable
 
     private void MarkProviderUnavailable(string providerName, Exception exception)
     {
-        foreach (AgentRuntime runtime in Agents.Values.Where(runtime =>
-                     runtime.ProviderName.Equals(providerName, StringComparison.OrdinalIgnoreCase)))
+        if (ProviderFailurePolicy.IsTransient(exception)) return;
+        lock (_memorySync)
         {
-            runtime.IsAvailable = false;
-            runtime.UnavailableReason = exception.GetType().Name;
-        }
+            foreach (AgentRuntime runtime in Agents.Values.Where(runtime =>
+                         runtime.ProviderName.Equals(providerName, StringComparison.OrdinalIgnoreCase)))
+            {
+                runtime.IsAvailable = false;
+                runtime.UnavailableReason = exception.GetType().Name;
+            }
 
-        int index = ProviderStatuses.FindIndex(status =>
-            status.Provider.Equals(providerName, StringComparison.OrdinalIgnoreCase));
-        var status = new ProviderStatus(
-            providerName,
-            false,
-            "외부 AI 서버에 연결할 수 없어 게임 내 대체 응답을 사용합니다.");
-        if (index >= 0) ProviderStatuses[index] = status;
-        else ProviderStatuses.Add(status);
+            int index = ProviderStatuses.FindIndex(status =>
+                status.Provider.Equals(providerName, StringComparison.OrdinalIgnoreCase));
+            var status = new ProviderStatus(
+                providerName,
+                false,
+                "외부 AI 서버에 연결할 수 없어 게임 내 대체 응답을 사용합니다.");
+            if (index >= 0) ProviderStatuses[index] = status;
+            else ProviderStatuses.Add(status);
+        }
     }
 
     private static bool IsProviderFailure(Exception exception, CancellationToken requestAborted)
@@ -699,10 +851,13 @@ internal sealed class GameSession : IAsyncDisposable
             output_tokens = response?.Usage?.OutputTokenCount ?? 0,
             total_tokens = response?.Usage?.TotalTokenCount ?? 0
         };
-        await File.AppendAllTextAsync(
-            ResponseLogPath,
-            JsonSerializer.Serialize(record, JsonDefaults.Options) + Environment.NewLine,
-            cancellationToken);
+        await _responseLogGate.WaitAsync(cancellationToken);
+        try
+        {
+            await File.AppendAllTextAsync(ResponseLogPath,
+                JsonSerializer.Serialize(record, JsonDefaults.Options) + Environment.NewLine, cancellationToken);
+        }
+        finally { _responseLogGate.Release(); }
     }
 
     private async Task SaveAsync(CancellationToken cancellationToken)
@@ -793,6 +948,7 @@ internal sealed class GameSession : IAsyncDisposable
         await _gate.WaitAsync();
         try
         {
+            await _scheduler.DisposeAsync();
             _operationProgress.Clear();
             foreach (AgentRuntime runtime in Agents.Values) await runtime.DisposeAsync();
             if (_ownsRateLimiters)
