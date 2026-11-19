@@ -143,9 +143,11 @@
     const setting = await response.json();
     const api = new URL(setting.apiBaseUrl);
     const isLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname);
-    if ((!isLocal && api.protocol !== "https:") ||
+    const trustedOrigin = api.origin === window.location.origin ||
+        api.origin === "https://mafia-agent-framework.onrender.com";
+    if ((!isLocal && (api.protocol !== "https:" || !trustedOrigin)) ||
         (isLocal && !["http:", "https:"].includes(api.protocol)) ||
-        !api.pathname.replace(/\/$/, "").endsWith("/agent-framework") ||
+        api.pathname.replace(/\/$/, "") !== "/agent-framework" ||
         api.username || api.password || api.search || api.hash)
       throw new Error("서버 주소 설정이 올바르지 않습니다.");
     return api.href.replace(/\/$/, "");

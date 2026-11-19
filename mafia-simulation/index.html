@@ -25,7 +25,6 @@
       <canvas id="unity-canvas" tabindex="-1" aria-label="마피아 마을 게임"></canvas>
       <button id="fullscreen-button" type="button" aria-label="전체 화면">⛶</button>
       <button id="settings-button" type="button" hidden>설정 다시 하기</button>
-      <a id="provider-sample-link" href="TemplateData/provider-sample.json" download="provider-sample.json">Provider JSON 예시</a>
     </div>
     <div id="unity-warning" role="alert" hidden></div>
   </main>
@@ -39,15 +38,15 @@
   </section>
   <script>
     window.cozyUnityBuild = {
-      loaderUrl: "Build/v0.3.5.loader.js",
+      loaderUrl: "Build/v0.3.17.loader.js",
       config: {
-        dataUrl: "Build/v0.3.5.data",
-        frameworkUrl: "Build/v0.3.5.framework.js",
-        codeUrl: "Build/v0.3.5.wasm",
+        dataUrl: "Build/v0.3.17.data",
+        frameworkUrl: "Build/v0.3.17.framework.js",
+        codeUrl: "Build/v0.3.17.wasm",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "MafiaSimulation",
-        productVersion: "0.3.5",
+        productVersion: "0.3.17",
         showBanner: function (message, type) {
           var warning = document.getElementById("unity-warning");
           warning.textContent = message;

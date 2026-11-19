@@ -1,8 +1,0 @@
-{
-  "model": "{0}",
-  {3}
-  "messages": [
-    { "role": "system", "content": "{1}" },
-    { "role": "user", "content": "{2}" }
-  ]
-}
