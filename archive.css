@@ -9,3 +9,9 @@
 .study section h2,.study h3 {margin:0 0 .5rem}.study section p {margin:0 0 1.4rem}
 .study figure {margin:0 0 1rem}.study figcaption {color:#47413b}
 @media(max-width:620px){.study section{grid-template-columns:1fr;gap:1rem}}
+
+.card-links {display:flex;align-items:baseline;flex-wrap:wrap;gap:.25rem 1.25rem;margin-top:.85rem}
+.card-links a {display:inline-block;padding:.45rem 0;text-decoration:underline;text-underline-offset:.24em}
+.card-links .action {margin:0}
+.card-links .button {padding:.65rem 1rem;text-decoration:none}
+#projects + section {margin-top:3rem}
