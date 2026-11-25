@@ -82,3 +82,45 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
+
+@font-face {
+  font-family: Pretendard;
+  src: url("assets/PretendardVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+:root {
+  color-scheme: dark;
+  --paper: #12171d;
+  --panel: #1b232c;
+  --ink: #ecf1f5;
+  --muted: #b4c1cd;
+  --edge: #394651;
+  --accent: #84decb;
+  --selected: #223d3b;
+  --sans: Pretendard, "Malgun Gothic", system-ui, sans-serif;
+}
+body, .study figcaption, .wordmark small, small, .kicker, .heading span, figcaption {
+  font-family: var(--sans);
+}
+.study h1 {font-family: Georgia, var(--sans)}
+.grid article, .feature figure {background: var(--panel)}
+.feature figure img, .study img {background: #101418}
+.heading, footer, .study section {border-color: var(--edge)}
+.kicker, .note-label, .feature h1 i {color: var(--accent)}
+figcaption, .study figcaption, .heading span, .wordmark small {color: var(--muted)}
+.note-actions .note-link {background: var(--accent); color: #102824; border-color: var(--accent)}
+.note-actions .note-link:is(:hover,:focus-visible) {background: #b2ecdf}
+.note-actions .resource-icon {background: var(--panel); color: var(--ink)}
+.note-actions .resource-icon:is(:hover,:focus-visible) {background: var(--selected); color: var(--accent)}
+.note-actions .resource-icon:focus-visible, a:focus-visible, summary:focus-visible {outline: 2px solid var(--accent); outline-offset: 3px}
+.note-sidebar summary, .article-toc summary {cursor: pointer; font-weight: 650}
+.note-sidebar a {border-inline-start: 2px solid transparent}
+.note-sidebar a:hover {background: var(--panel)}
+.note-sidebar [aria-current="page"] {background: var(--selected); color: var(--accent); border-inline-start-color: var(--accent)}
+.article-toc {margin: 1rem 0; border-block: 1px solid var(--edge)}
+.article-toc summary {padding: .65rem .25rem; color: var(--muted)}
+.article-toc summary::marker {color: var(--accent)}
+.article-toc nav {display: flex; flex-wrap: wrap; gap: .25rem 1rem; padding: 0 .25rem .75rem}
+.article-toc a {padding: .35rem 0; color: var(--accent); text-decoration: underline; text-underline-offset: .23em}
+.notebook .study section {scroll-margin-top: 1.5rem}
