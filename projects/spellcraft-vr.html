@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spellcraft VR · 곽성대</title><link rel="stylesheet" href="../archive.css"></head>
+<body><header><a class="wordmark" href="../">곽성대 <small>/ Game Developer</small></a><nav><a href="../#projects">작품 목록</a></nav></header>
+<main class="study"><p class="kicker">VR GAME CONCEPT · Concept / Side Project · 시스템·3D·레벨 디자인</p><h1>Spellcraft VR</h1><p class="lead">손짓으로 동작과 속성을 골라 주문을 만드는 VR 던전 콘셉트입니다. 손짓을 잘못 읽었을 때 플레이어가 어느 단계에서 실패했는지 알아볼 수 있는 입력 방식을 검토했습니다.</p><div class="resources"><a class="button" href="https://app.notion.com/p/24dcce9c8a2381dfbf22ec4c38e29c2d">개발 노트 ↗</a></div>
+<img loading="lazy" src="../assets/projects/spellcraft-vr.png" alt="Spellcraft VR 마법 전투 콘셉트 화면">
+<section><h2>담당 작업</h2><div><p>충돌 순서·이동 경로 기반 제스처 입력 탐색</p>
+<p>동사·명사·반복 연산으로 구성한 마법 문법</p>
+<p>로그라이크 던전 탐험과 중거리 마법 전투</p>
+<p>시스템·3D 그래픽·레벨·사운드 디자인</p></div></section>
+<section><h2>주문 설계</h2><div><h3>핵심 경험 정의</h3><p>D&amp;D의 주문 캐스팅, Noita의 조합 마법, Isaac의 반복 탐험을 분석해 직접 만든 주문으로 던전을 공략하는 VR 경험을 목표로 정했습니다.</p>
+<h3>제스처 입력 후보</h3><p>Collision Box 통과 순서, 손의 이동 방향, 경로 텍스처 OCR을 후보로 두고 정확도, 피드백 가능성, VR 성능 비용을 비교했습니다.</p>
+<h3>주문 문법 설계</h3><p>쏘다 같은 동사와 불·아이스 같은 명사를 순서대로 해석하고 반복 연산을 수식어로 추가하는 구조를 설계했습니다.</p>
+<h3>전투 루프 가설</h3><p>중거리 마법 전투와 절차적 던전 탐험을 결합하고 주문 제작, 전투 검증, 보상 획득, 다음 방 진입의 반복 흐름을 검증 범위로 설정했습니다.</p></div></section>
+<section><h2>검토한 선택지</h2><div><h3>복잡한 제스처일수록 인식 실패 이유가 불명확</h3><p>정확도만 높이는 방식보다 사용자가 어느 구간에서 실패했는지 보여줄 수 있는 단계형 입력을 우선 검토했습니다. 충돌 순서 방식은 디버깅과 시각 피드백이 명확하다는 장점이 있습니다.</p>
+<h3>주문 종류가 늘수록 개별 구현이 폭증</h3><p>완성 주문을 하나씩 하드코딩하지 않고 동사·명사·반복을 조합하는 문법으로 확장 지점을 정의했습니다. 두 번 반복한 발사+불은 2연발 파이어볼처럼 해석됩니다.</p></div></section>
+
+</main><footer><a href="../#projects">모든 프로젝트 보기 ↑</a></footer></body></html>
