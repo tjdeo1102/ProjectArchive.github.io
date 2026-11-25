@@ -15,3 +15,70 @@
 .card-links .action {margin:0}
 .card-links .button {padding:.65rem 1rem;text-decoration:none}
 #projects + section {margin-top:3rem}
+
+.note-actions {display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:1rem 0}
+.note-actions a {display:inline-grid;place-items:center;height:44px;border:1px solid #afa99b;border-radius:5px}
+.note-actions a:hover,.note-actions a:focus-visible {background:#e6e1d5}
+.note-actions .note-link {padding:0 15px;background:#252621;color:#fff;font-weight:650}
+.note-actions .note-link:hover {background:#46473d}
+.resource-icon {width:44px}.resource-icon svg {width:22px;height:22px}
+.notebook {display:grid;grid-template-columns:210px minmax(0,720px);gap:clamp(2rem,6vw,6rem);width:min(1160px,91%);margin:2.5rem auto 0}
+.notebook main {margin:0;width:100%;padding:0;min-width:0}
+.note-sidebar {position:sticky;top:1rem;align-self:start;max-height:90vh;overflow:auto;border-left:2px solid #c9c3b6;padding-left:1rem}
+.note-sidebar details+details {margin-top:1rem}.note-sidebar summary {font-weight:700;padding:.45rem 0;cursor:pointer}
+.note-sidebar nav {display:grid;gap:0}.note-sidebar a {padding:.3rem .6rem;font-size:.92rem}
+.note-sidebar [aria-current=page] {background:#e8e2d5;font-weight:700}
+.note-label {font-weight:bold;color:#79442b;margin:0}
+.notebook .study section {display:block;scroll-margin-top:1.5rem}
+.notebook .study h2 {margin-bottom:1.25rem;font-size:1.55rem}
+.notebook .study p {line-height:1.85}.notebook .study figure {margin:.8rem 0 2rem}
+.notebook .study figcaption {font: .88rem/1.55 system-ui;letter-spacing:0}
+.skip {position:absolute;left:-9999px}.skip:focus {left:1rem;top:1rem;background:white;padding:.6rem}
+@media(max-width:760px){.notebook {display:block;margin-top:1rem}.note-sidebar {position:static;max-height:none;border:1px solid #c9c3b6;padding:.45rem .8rem;margin-bottom:1.5rem}.note-sidebar nav {grid-template-columns:repeat(2,minmax(0,1fr))}.note-sidebar details+details {margin-top:.25rem}}
+
+/* Project catalog and notebook surfaces */
+:root {--ink:#152b33;--muted:#445d64;--edge:#c3d2d1;--paper:#f5f8f6;--accent:#07655c}
+body {background:var(--paper);color:var(--ink)}
+header {border-color:var(--edge)}
+.feature {gap:clamp(1.5rem,4vw,4rem)}
+.feature figure {background:#122c31;border-radius:12px;overflow:hidden}
+.feature h1 i {color:var(--accent)}
+.kicker,.note-label {color:var(--accent)}
+.heading {border-color:var(--ink)}
+.grid article {background:white;border:1px solid var(--edge);border-radius:12px;overflow:hidden;padding-bottom:0;display:flex;flex-direction:column}
+.grid .body {padding:1rem 1.15rem;display:flex;flex-direction:column;flex:1}
+.body p,.body small {color:var(--muted)}
+.grid .note-actions {margin:auto 0 0;padding-top:1rem}
+.note-actions {gap:.45rem}
+.note-actions .note-link {display:inline-flex;gap:.5rem;align-items:center;background:var(--ink);border-color:var(--ink);border-radius:8px}
+.note-actions svg {width:23px;height:23px;fill:currentColor}
+.note-actions .note-link svg {width:19px;height:19px}
+.note-actions .resource-icon {border-radius:8px;color:var(--ink);background:white;border-color:var(--edge);position:relative}
+.note-actions .resource-icon:hover,.note-actions .resource-icon:focus-visible {color:var(--accent);background:#e2f0ea;border-color:var(--accent)}
+.note-sidebar {border-color:var(--edge)}.note-sidebar [aria-current=page]{background:#dcece6;color:#164d44}
+.notebook .study h2 {color:var(--accent)}.study figcaption {background:var(--paper)}
+@media(max-width:620px){.feature h1{font-size:clamp(2.85rem,10vw,4rem)}.grid .body{padding:1rem}}
+
+/* SVG icons: Ionicons 7.4.0
+The MIT License (MIT)
+
+Copyright (c) 2015-present Ionic (http://ionic.io/)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
